@@ -127,7 +127,7 @@ def oauth_user(data: OAuthUserIn, db: Session = Depends(get_db)):
         user = User(
             email=data.email,
             full_name=full_name,
-            hashed_password=hash_password(''),  # no password for OAuth-only users
+            hashed_password=None,  # OAuth users have no password
             role='user'
         )
         db.add(user)

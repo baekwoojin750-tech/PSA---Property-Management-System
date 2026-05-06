@@ -14,6 +14,8 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 def verify_password(plain: str, hashed: str) -> bool:
+    if not hashed:
+        return False  # OAuth-only users have no password
     return pwd_context.verify(plain, hashed)
 
 def create_access_token(data: dict, permissions: dict = {}) -> str:

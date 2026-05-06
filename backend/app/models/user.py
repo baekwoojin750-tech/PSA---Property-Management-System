@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.sql import func
+
 from app.core.database import Base
 
 
@@ -12,6 +13,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
+    reactivation_requested = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     role = Column(String, nullable=False, default="user")
     authorization_expiry = Column(DateTime, nullable=True)

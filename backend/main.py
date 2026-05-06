@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import traceback
+from sqlalchemy import inspect, text
 from app.api.routes import auth, assets, borrows, activity_logs
 from app.core.config import settings
 from app.core.database import Base, engine, get_db
@@ -17,6 +18,22 @@ import uvicorn
 import os
 
 Base.metadata.create_all(bind=engine)
+
+
+def ensure_user_columns():
+    inspector = inspect(engine)
+    columns = {column["name"] for column in inspector.get_columns("users")}
+    statements: list[str] = []
+
+    if "reactivation_requested" not in columns:
+        statements.append("ALTER TABLE users ADD COLUMN reactivation_requested BOOLEAN DEFAULT FALSE")
+
+    if not statements:
+        return
+
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
 
 def create_sample_accounts():
     db: Session = next(get_db())
@@ -54,6 +71,7 @@ def create_sample_accounts():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    ensure_user_columns()
     create_sample_accounts()
     yield
 

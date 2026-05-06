@@ -10,6 +10,11 @@ export const registerUser = async (email: string, full_name: string, password: s
   return response.data
 }
 
+export const createAdminAccount = async (email: string, full_name: string, password: string) => {
+  const response = await api.post('/api/auth/create-admin', { email, full_name, password })
+  return response.data
+}
+
 export const forgotPassword = async (email: string) => {
   const response = await api.post('/api/auth/forgot-password', { email })
   return response.data
@@ -94,6 +99,16 @@ export const rejectAuthorization = async (token: string, request_id: number) => 
 
 export const getAllUsers = async () => {
   const response = await api.get('/api/auth/all-users')
+  return response.data
+}
+
+export const toggleUserStatus = async (user_id: number, is_active: boolean) => {
+  const response = await api.post('/api/auth/toggle-user-status', { user_id, is_active })
+  return response.data
+}
+
+export const requestReactivation = async (email: string) => {
+  const response = await api.post('/api/auth/request-reactivation', { email })
   return response.data
 }
 

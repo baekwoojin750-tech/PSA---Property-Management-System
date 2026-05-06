@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { loginUser, registerUser } from '../../services/authService'
+import { loginUser, registerUser, requestReactivation } from '../../services/authService'
 import { useAuthStore } from '../../stores/authStore'
 
 export default function AuthPage() {
@@ -13,6 +13,8 @@ export default function AuthPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const [loginError, setLoginError] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
+  const [reactivationLoading, setReactivationLoading] = useState(false)
+  const [reactivationMessage, setReactivationMessage] = useState('')
 
   const [regName, setRegName] = useState('')
   const [regEmail, setRegEmail] = useState('')
@@ -29,6 +31,7 @@ export default function AuthPage() {
     }
     setLoginLoading(true)
     setLoginError('')
+    setReactivationMessage('')
     try {
       const data = await loginUser(loginEmail, loginPassword)
       setToken(data.access_token)
@@ -69,6 +72,23 @@ export default function AuthPage() {
       setRegError(err.response?.data?.detail || 'Registration failed')
     } finally {
       setRegLoading(false)
+    }
+  }
+
+  const handleRequestReactivation = async () => {
+    if (!loginEmail.endsWith('@psa.gov.ph')) {
+      setLoginError('Enter your @psa.gov.ph email first')
+      return
+    }
+    setReactivationLoading(true)
+    setReactivationMessage('')
+    try {
+      const data = await requestReactivation(loginEmail)
+      setReactivationMessage(data.message || 'Reactivation request submitted.')
+    } catch (err: any) {
+      setLoginError(err.response?.data?.detail || 'Failed to request reactivation')
+    } finally {
+      setReactivationLoading(false)
     }
   }
 
@@ -506,6 +526,7 @@ export default function AuthPage() {
                 <div className="form-subtitle">Sign in to your PSA account</div>
 
                 {loginError && <div className="alert-error">{loginError}</div>}
+                {reactivationMessage && <div className="alert-success">{reactivationMessage}</div>}
 
                 <div className="field">
                   <label className="field-label">Email</label>
@@ -545,6 +566,17 @@ export default function AuthPage() {
                 <button className="btn-primary" onClick={handleLogin} disabled={loginLoading}>
                   {loginLoading ? 'Signing in...' : 'Sign In'}
                 </button>
+
+                {loginError.toLowerCase().includes('disabled') || loginError.toLowerCase().includes('suspended') ? (
+                  <button
+                    className="btn-primary"
+                    onClick={handleRequestReactivation}
+                    disabled={reactivationLoading}
+                    style={{ marginTop: '0.75rem', background: 'linear-gradient(135deg, #0f766e, #0f766e)' }}
+                  >
+                    {reactivationLoading ? 'Sending request...' : 'Request Reactivation'}
+                  </button>
+                ) : null}
 
                 <div className="switch-text">
                   No account?{' '}

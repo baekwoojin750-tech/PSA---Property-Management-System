@@ -1,6 +1,22 @@
 import { useState, useEffect, useRef } from 'react'
 import { getAllAssets, getAllBorrowRequests } from '../../services/authService'
 
+type DashboardAsset = {
+  id: number | string
+  item_name?: string | null
+  property_number?: string | null
+  location?: string | null
+  equipment_category?: string | null
+  serial_number?: string | null
+  status?: string | null
+}
+
+type DashboardBorrow = {
+  status?: string | null
+}
+
+const asText = (value: unknown) => (typeof value === 'string' ? value : '')
+
 const icons = {
   building: (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -17,8 +33,8 @@ const icons = {
 const LOCATIONS = ['SOC', 'CRASS', 'OCSS', 'NATIONAL ID', 'CSR OUTLET', 'SATELLITE OFFICE']
 
 export default function Dashboard() {
-  const [assets, setAssets] = useState<any[]>([])
-  const [borrows, setBorrows] = useState<any[]>([])
+  const [assets, setAssets] = useState<DashboardAsset[]>([])
+  const [borrows, setBorrows] = useState<DashboardBorrow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -57,12 +73,22 @@ export default function Dashboard() {
           getAllAssets(),
           getAllBorrowRequests(),
         ])
+
+        if (!Array.isArray(assetsData)) {
+          throw new Error('Assets response is not an array')
+        }
+        if (!Array.isArray(borrowsData)) {
+          throw new Error('Borrow requests response is not an array')
+        }
+
         setAssets(assetsData)
         setBorrows(borrowsData)
         setError(null)
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to fetch data:', err)
-        setError(err.message || 'Failed to load dashboard data')
+        setAssets([])
+        setBorrows([])
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
       } finally {
         if (showLoading) setLoading(false)
       }
@@ -95,7 +121,7 @@ export default function Dashboard() {
   })
 
   const offices = ['All Office', ...LOCATIONS]
-  const categories = ['All Category', ...new Set(assets.map(a => a.equipment_category))]
+  const categories = ['All Category', ...new Set(assets.map(a => asText(a.equipment_category)).filter(Boolean))]
   const statuses = ['All Status', 'Serviceable', 'Non-Serviceable', 'Borrowed']
 
   const statusBadge: Record<string, string> = {
@@ -105,12 +131,17 @@ export default function Dashboard() {
   }
 
   const filtered = assets.filter((a) => {
+    const itemName = asText(a.item_name)
+    const propertyNumber = asText(a.property_number)
+    const location = asText(a.location)
+    const category = asText(a.equipment_category)
+    const status = asText(a.status)
     const matchSearch =
-      a.item_name.toLowerCase().includes(search.toLowerCase()) ||
-      a.property_number.toLowerCase().includes(search.toLowerCase())
-    const matchOffice = officeFilter === 'All Office' || a.location === officeFilter
-    const matchCategory = categoryFilter === 'All Category' || a.equipment_category === categoryFilter
-    const matchStatus = statusFilter === 'All Status' || a.status === statusFilter
+      itemName.toLowerCase().includes(search.toLowerCase()) ||
+      propertyNumber.toLowerCase().includes(search.toLowerCase())
+    const matchOffice = officeFilter === 'All Office' || location === officeFilter
+    const matchCategory = categoryFilter === 'All Category' || category === categoryFilter
+    const matchStatus = statusFilter === 'All Status' || status === statusFilter
     return matchSearch && matchOffice && matchCategory && matchStatus
   })
 
@@ -320,8 +351,8 @@ export default function Dashboard() {
                       <td className="px-5 py-3.5 text-sm text-slate-300">{asset.equipment_category}</td>
                       <td className="px-5 py-3.5 text-xs font-mono text-slate-400">{asset.serial_number || '—'}</td>
                       <td className="px-5 py-3.5">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusBadge[asset.status] ?? 'bg-slate-700 text-slate-300'}`}>
-                          {asset.status}
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusBadge[asText(asset.status)] ?? 'bg-slate-700 text-slate-300'}`}>
+                          {asText(asset.status) || 'Unknown'}
                         </span>
                       </td>
                     </tr>

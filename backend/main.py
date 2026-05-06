@@ -54,10 +54,13 @@ app = FastAPI(title="Property Management System", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    # Allow any origin on your local network (192.168.x.x, 10.x.x.x, etc.)
-    # For a LAN-only app this is safe. If you deploy publicly, restrict this.
-    allow_origins=["*"],
-    allow_credentials=False,   # Must be False when allow_origins=["*"]
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://psa-property-management-system.vercel.app",
+        "*"
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

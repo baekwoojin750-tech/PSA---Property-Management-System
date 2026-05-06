@@ -40,11 +40,6 @@ class RevokeAuthorizationBody(BaseModel):
     page: Optional[str] = None   # if omitted, revokes ALL pages for this admin
 
 
-class OAuthUserIn(BaseModel):
-    email: str
-    full_name: Optional[str] = None
-
-
 # ── Auth endpoints ────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=UserOut)
@@ -114,41 +109,6 @@ def reset_password(data: ResetPassword, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Password reset successful"}
 
-
-@router.post("/oauth-user")
-def oauth_user(data: OAuthUserIn, db: Session = Depends(get_db)):
-    """Handle OAuth login — auto-creates the user if they don't exist yet.
-    Accepts any email domain (not restricted to @psa.gov.ph).
-    """
-    user = db.query(User).filter(User.email == data.email).first()
-
-    if not user:
-        full_name = data.full_name or data.email.split('@')[0]
-        user = User(
-            email=data.email,
-            full_name=full_name,
-            hashed_password=None,  # OAuth users have no password
-            role='user'
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    access_token = create_access_token({
-        "sub": str(user.id),
-        "email": user.email,
-        "role": user.role
-    })
-
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "id": user.id,
-        "email": user.email,
-        "full_name": user.full_name,
-        "role": user.role,
-        "authorization_expiry": getattr(user, 'authorization_expiry', None),
-    }
 
 
 @router.post("/create-admin", response_model=UserOut)

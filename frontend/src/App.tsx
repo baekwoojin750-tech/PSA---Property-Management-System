@@ -5,7 +5,6 @@ import AuthorizationGate from './components/AuthorizationGate'
 import { useAuthStore } from './stores/authStore'
 
 const AuthPage                = lazy(() => import('./pages/auth/Login'))
-const AuthCallback            = lazy(() => import('./pages/auth/AuthCallback'))
 const ForgotPassword          = lazy(() => import('./pages/auth/ForgotPassword'))
 const ResetPassword           = lazy(() => import('./pages/auth/ResetPassword'))
 const MainLayout              = lazy(() => import('./layouts/MainLayout'))
@@ -29,7 +28,6 @@ function App() {
         {/* ── Public ── */}
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<AuthPage />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 

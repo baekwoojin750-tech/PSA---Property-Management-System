@@ -182,7 +182,7 @@ export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
         const transformedAssets = assets.map((asset: any) => transformAsset(asset))
         const categories = Array.from(new Set([
           ...defaultEquipmentCategories,
-          ...transformedAssets.map(asset => asset.equipmentCategory).filter(Boolean),
+          ...transformedAssets.map((asset: Asset) => asset.equipmentCategory).filter(Boolean),
         ]))
         setAssetList(transformedAssets)
         setEquipmentCategories(categories)

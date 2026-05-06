@@ -14,7 +14,7 @@ export function AssetScanner() {
   const [cameraError, setCameraError] = useState('')
   const [scannedAsset, setScannedAsset] = useState<Asset | null>(null)
   const [recentScans, setRecentScans] = useState<ScanRecord[]>([])
-  const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set())
+  
   const assetsRef = useRef<Asset[]>([])
   const isSecureCameraContext =
     typeof window !== 'undefined' &&
@@ -127,11 +127,6 @@ export function AssetScanner() {
 
   useEffect(() => () => stopCamera(), [stopCamera])
 
-  const handleRequest = () => {
-    if (!scannedAsset) return
-    setRequestedIds(prev => new Set(prev).add(scannedAsset.propertyNumber))
-    setScannedAsset(null)
-  }
 
   return (
     <div className="space-y-5">
@@ -358,24 +353,15 @@ export function AssetScanner() {
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{scan.scannedAt}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {requestedIds.has(scan.propertyNumber) ? (
-                        <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                          </svg>
-                          Requested
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            const a = assets.find(x => x.propertyNumber === scan.propertyNumber)
-                            if (a) setScannedAsset(a)
-                          }}
-                          className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold underline underline-offset-2 transition"
-                        >
-                          View
-                        </button>
-                      )}
+                      <button
+                        onClick={() => {
+                          const a = assets.find(x => x.propertyNumber === scan.propertyNumber)
+                          if (a) setScannedAsset(a)
+                        }}
+                        className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold underline underline-offset-2 transition"
+                      >
+                        View
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -390,7 +376,12 @@ export function AssetScanner() {
         <AssetModal
           asset={scannedAsset}
           onClose={() => setScannedAsset(null)}
-          onRequest={handleRequest}
+          onBorrowSuccess={(updated) => {
+            // Update the asset in both local lists so status is reflected immediately
+            setAssets(prev => prev.map(a => a.propertyNumber === updated.propertyNumber ? updated : a))
+            setRecentScans(prev => prev.map(s => s.propertyNumber === updated.propertyNumber ? { ...s, status: updated.status } : s))
+            setScannedAsset(null)
+          }}
         />
       )}
     </div>

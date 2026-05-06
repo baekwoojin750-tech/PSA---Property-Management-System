@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import type { BorrowRecord } from './BorrowTab'
-import { getAllBorrowRequests } from '../../services/authService'
+import { getAllBorrowRequests, updateBorrowRequest, getAssetByPropertyNumber, updateAsset } from '../../services/authService'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function useBase64Image(src: string) {
@@ -209,34 +209,59 @@ export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps
     form.items.every(it => it.description && it.propertyNumber && it.dateTimeReturned)
   )
 
-  const handleSubmit = () => {
-    if (!isFormValid) return
+  const [submitting, setSubmitting] = useState(false)
 
-    // Mark linked record as Returned in borrow records
-    if (form.linkedRecordId) {
-      setRecords(prev =>
-        prev.map(r => r.id === form.linkedRecordId ? { ...r, status: 'Returned' as const } : r)
-      )
+  const handleSubmit = async () => {
+    if (!isFormValid || submitting) return
+    setSubmitting(true)
+    try {
+      // 1. Persist borrow record status → Returned in the DB
+      if (form.linkedRecordId) {
+        // ID is stored as "BR-<numeric_id>" — strip prefix to get the numeric id
+        const numericId = parseInt(form.linkedRecordId.replace('BR-', ''), 10)
+        if (!isNaN(numericId)) {
+          await updateBorrowRequest(numericId, { status: 'Returned' })
+        }
+        // Optimistic UI update
+        setRecords(prev =>
+          prev.map(r => r.id === form.linkedRecordId ? { ...r, status: 'Returned' as const } : r)
+        )
+      }
+
+      // 2. Flip each asset status → Serviceable in the DB
+      for (const item of form.items) {
+        if (!item.propertyNumber) continue
+        try {
+          const assetData = await getAssetByPropertyNumber(item.propertyNumber)
+          await updateAsset(assetData.serial_code, { status: 'Serviceable' })
+        } catch {
+          console.warn(`Could not update status for asset ${item.propertyNumber}`)
+        }
+      }
+
+      // 3. Add entries to the returned records table
+      const newReturned: ReturnedRecord[] = form.items.map((item, idx) => ({
+        id: `RT-${Date.now()}-${idx}`,
+        borrowerId: form.linkedRecordId || '—',
+        returnedByName: form.returnedByName,
+        returnedByDesignation: form.returnedByDesignation,
+        borrowedFromName: form.borrowedFromName,
+        itemName: item.description,
+        propertyNumber: item.propertyNumber,
+        returnDate: item.dateTimeReturned,
+        purposeCompliance: form.purposeCompliance,
+        remarks: item.remarks,
+      }))
+      setReturnedRecords(prev => [...newReturned, ...prev])
+
+      setForm(emptyForm)
+      setSuccessBanner(true)
+      setTimeout(() => setSuccessBanner(false), 4000)
+    } catch (err) {
+      console.error('Failed to submit return slip:', err)
+    } finally {
+      setSubmitting(false)
     }
-
-    // Add entries to the returned records table
-    const newReturned: ReturnedRecord[] = form.items.map((item, idx) => ({
-      id: `RT-${Date.now()}-${idx}`,
-      borrowerId: form.linkedRecordId || '—',
-      returnedByName: form.returnedByName,
-      returnedByDesignation: form.returnedByDesignation,
-      borrowedFromName: form.borrowedFromName,
-      itemName: item.description,
-      propertyNumber: item.propertyNumber,
-      returnDate: item.dateTimeReturned,
-      purposeCompliance: form.purposeCompliance,
-      remarks: item.remarks,
-    }))
-    setReturnedRecords(prev => [...newReturned, ...prev])
-
-    setForm(emptyForm)
-    setSuccessBanner(true)
-    setTimeout(() => setSuccessBanner(false), 4000)
   }
 
   const handlePrint = () => {
@@ -587,11 +612,12 @@ export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps
                 Print Slip
               </button>
             </div>
-            <button type="button" onClick={handleSubmit} disabled={!isFormValid} className="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition flex items-center justify-center gap-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Submit Return
+            <button type="button" onClick={handleSubmit} disabled={!isFormValid || submitting} className="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition flex items-center justify-center gap-2">
+{submitting ? (
+                <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Submitting...</>
+              ) : (
+                <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> Submit Return</>
+              )}
             </button>
           </div>
         </div>

@@ -49,6 +49,22 @@ def get_asset(serial_code: str, db: Session = Depends(get_db)):
     return asset
 
 
+
+@router.put("/by-property/{property_number}", response_model=AssetOut)
+def update_asset_by_property_number(property_number: str, data: AssetUpdate, db: Session = Depends(get_db)):
+    """Update an asset by property number (used when serial_code is unavailable)"""
+    asset = db.query(Asset).filter(Asset.property_number == property_number).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    update_data = data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(asset, field, value)
+
+    db.commit()
+    db.refresh(asset)
+    return asset
+
 @router.put("/{serial_code}", response_model=AssetOut)
 def update_asset(serial_code: str, data: AssetUpdate, db: Session = Depends(get_db)):
     """Update an asset"""

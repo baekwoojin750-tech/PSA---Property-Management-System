@@ -2,10 +2,16 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import type { Asset } from './assetTypes'
 import { statusColor } from './assetTypes'
+import {
+  getAllAssets,
+  createBorrowRequest,
+  updateAsset,
+  getAssetByPropertyNumber,
+  getActiveBorrowByProperty,
+} from '../../services/authService'
+import { transformAsset } from './assetTypes'
 
 // ─── Searchable Dropdown Component ───────────────────────────────────────────
-// Uses a portal so the dropdown renders on document.body,
-// escaping any overflow-hidden ancestor containers.
 export function SearchableDropdown({ options, value, onChange, placeholder }: {
   options: string[]
   value: string
@@ -110,12 +116,204 @@ export function SearchableDropdown({ options, value, onChange, placeholder }: {
   )
 }
 
+// ─── Inline Borrow Form (used inside AssetModal when status is Serviceable) ──
+interface BorrowFormData {
+  borrowerName: string
+  borrowerDesignation: string
+  department: string
+  purpose: string
+  destination: string
+  startDate: string
+  endDate: string
+  borrowedFromName: string
+}
+
+function InlineBorrowForm({
+  asset,
+  onSuccess,
+  onCancel,
+}: {
+  asset: Asset
+  onSuccess: () => void
+  onCancel: () => void
+}) {
+  const today = new Date().toISOString().split('T')[0]
+  const [form, setForm] = useState<BorrowFormData>({
+    borrowerName: '',
+    borrowerDesignation: '',
+    department: '',
+    purpose: '',
+    destination: '',
+    startDate: today,
+    endDate: '',
+    borrowedFromName: '',
+  })
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const set = (k: keyof BorrowFormData, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  const isValid = !!(form.borrowerName && form.startDate)
+
+  const handleSubmit = async () => {
+    if (!isValid || submitting) return
+    setSubmitting(true)
+    setError('')
+    try {
+      // 1. Create the borrow request
+      await createBorrowRequest({
+        borrower_name: form.borrowerName,
+        borrower_designation: form.borrowerDesignation,
+        department: form.department,
+        item_name: asset.itemName,
+        property_number: asset.propertyNumber,
+        start_date: form.startDate,
+        end_date: form.endDate || null,
+        status: 'Active',
+        destination: form.destination,
+        purpose: form.purpose,
+        borrowed_from_name: form.borrowedFromName,
+      })
+
+      // 2. Flip the asset status → Borrowed (look up serial_code first via property_number)
+      try {
+        const assetData = await getAssetByPropertyNumber(asset.propertyNumber)
+        await updateAsset(assetData.serial_code, { status: 'Borrowed' })
+      } catch {
+        // Non-fatal — borrow request was saved; status update is best-effort
+        console.warn('Could not update asset status to Borrowed')
+      }
+
+      onSuccess()
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Failed to submit borrow request. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const inputClass =
+    'w-full bg-[#070d18] border border-[#1a2744] rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition'
+  const labelClass = 'block text-[9px] font-semibold text-slate-500 uppercase tracking-widest mb-1'
+
+  return (
+    <div className="space-y-3">
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-xs text-red-400">{error}</div>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={labelClass}>Borrower Name *</label>
+          <input type="text" value={form.borrowerName} onChange={e => set('borrowerName', e.target.value)} className={inputClass} placeholder="Full name" />
+        </div>
+        <div>
+          <label className={labelClass}>Designation</label>
+          <input type="text" value={form.borrowerDesignation} onChange={e => set('borrowerDesignation', e.target.value)} className={inputClass} placeholder="e.g. Statistical Analyst" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={labelClass}>Department</label>
+          <input type="text" value={form.department} onChange={e => set('department', e.target.value)} className={inputClass} placeholder="e.g. RSSO" />
+        </div>
+        <div>
+          <label className={labelClass}>Borrowed From</label>
+          <input type="text" value={form.borrowedFromName} onChange={e => set('borrowedFromName', e.target.value)} className={inputClass} placeholder="Accountable officer" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={labelClass}>Start Date *</label>
+          <input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} className={`${inputClass} [color-scheme:dark]`} />
+        </div>
+        <div>
+          <label className={labelClass}>End Date</label>
+          <input type="date" value={form.endDate} min={form.startDate} onChange={e => set('endDate', e.target.value)} className={`${inputClass} [color-scheme:dark]`} />
+        </div>
+      </div>
+      <div>
+        <label className={labelClass}>Destination</label>
+        <input type="text" value={form.destination} onChange={e => set('destination', e.target.value)} className={inputClass} placeholder="Where it will be used" />
+      </div>
+      <div>
+        <label className={labelClass}>Purpose</label>
+        <input type="text" value={form.purpose} onChange={e => set('purpose', e.target.value)} className={inputClass} placeholder="Reason for borrowing" />
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button onClick={onCancel} className="flex-1 px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 border border-[#1e2d45] hover:bg-[#1a2744] hover:text-white transition">
+          Cancel
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={!isValid || submitting}
+          className="flex-1 px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white transition flex items-center justify-center gap-1.5"
+        >
+          {submitting ? (
+            <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Submitting...</>
+          ) : (
+            <><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> Confirm Borrow</>
+          )}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Asset Info Modal ─────────────────────────────────────────────────────────
-export function AssetModal({ asset, onClose, onRequest }: { asset: Asset; onClose: () => void; onRequest: () => void }) {
+// Branches on asset.status:
+//   Borrowed     → shows borrow details, no borrow button
+//   Serviceable  → shows details + "Borrow It" which opens the inline borrow form
+export function AssetModal({
+  asset,
+  onClose,
+  onBorrowSuccess,
+}: {
+  asset: Asset
+  onClose: () => void
+  /** Called after a borrow is successfully submitted — lets parent refresh state */
+  onBorrowSuccess?: (updatedAsset: Asset) => void
+  /** Legacy prop kept for backward compatibility (scanner used to pass onRequest) */
+  onRequest?: () => void
+}) {
+  const [showBorrowForm, setShowBorrowForm] = useState(false)
+  const [borrowDetails, setBorrowDetails] = useState<any>(null)
+  const [loadingBorrow, setLoadingBorrow] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+
+  // If the asset is Borrowed, fetch the active borrow record for display
+  useEffect(() => {
+    if (asset.status !== 'Borrowed') return
+    setLoadingBorrow(true)
+    getActiveBorrowByProperty(asset.propertyNumber)
+      .then(data => setBorrowDetails(data))
+      .catch(() => setBorrowDetails(null))
+      .finally(() => setLoadingBorrow(false))
+  }, [asset.propertyNumber, asset.status])
+
+  const handleBorrowSuccess = () => {
+    setShowBorrowForm(false)
+    setSuccessMsg('Borrow request submitted! Asset is now marked as Borrowed.')
+    if (onBorrowSuccess) {
+      // Return an optimistically-updated asset so parent can refresh UI
+      onBorrowSuccess({ ...asset, status: 'Borrowed' })
+    }
+  }
+
+  const printReturnSlip = () => {
+    const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+    const printWindow = window.open('', '_blank', 'width=750,height=900')
+    if (!printWindow) return
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Return Slip – ${asset.propertyNumber}</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#000;padding:28px 36px;background:#fff;}h1{font-size:14px;font-weight:900;text-align:center;letter-spacing:1px;margin-bottom:2px;}h2{font-size:11px;font-weight:700;text-align:center;margin-bottom:16px;color:#333;}.meta{display:flex;justify-content:space-between;margin-bottom:14px;}table{width:100%;border-collapse:collapse;margin-bottom:20px;}th{background:#f5f5f5;border:1px solid #ccc;padding:6px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.5px;text-align:left;}td{border:1px solid #ccc;padding:7px 8px;font-size:10px;}.label{font-weight:700;width:32%;color:#444;}.sig-row{display:flex;gap:40px;margin-top:32px;}.sig-box{flex:1;border-top:1px solid #000;padding-top:6px;font-size:9px;text-align:center;}footer{margin-top:20px;text-align:center;font-size:8px;color:#888;border-top:1px solid #eee;padding-top:8px;}@media print{@page{size:A4;margin:18mm 20mm;}}</style></head><body><h1>PHILIPPINE STATISTICS AUTHORITY</h1><h2>PROPERTY RETURN SLIP</h2><div class="meta"><span><strong>Date:</strong> ${today}</span><span><strong>Ref No.:</strong> RS-${asset.propertyNumber}</span></div><table><tr><td class="label">Item Name</td><td>${asset.itemName}</td></tr><tr><td class="label">Property Number</td><td>${asset.propertyNumber}</td></tr><tr><td class="label">Asset Tag</td><td>${asset.assetTag}</td></tr><tr><td class="label">Serial Number</td><td>${asset.serialNumber}</td></tr><tr><td class="label">Equipment Category</td><td>${asset.equipmentCategory}</td></tr><tr><td class="label">Office / Location</td><td>${asset.location}</td></tr><tr><td class="label">Unit Cost</td><td>₱${asset.unitCost}</td></tr><tr><td class="label">Status</td><td>${asset.status}</td></tr></table><div class="sig-row"><div class="sig-box">Returned By / Borrower<br/><span style="color:#888;font-size:8px;">Signature over Printed Name / Date</span></div><div class="sig-box">Received By / Property Custodian<br/><span style="color:#888;font-size:8px;">Signature over Printed Name / Date</span></div><div class="sig-box">Noted By / Division Chief<br/><span style="color:#888;font-size:8px;">Signature over Printed Name / Date</span></div></div><footer>PSA Property Management System | Generated: ${today}</footer></body></html>`)
+    printWindow.document.close()
+    printWindow.focus()
+    setTimeout(() => { printWindow.print(); printWindow.close() }, 500)
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-lg max-h-[92vh] bg-[#0d1421] border border-[#1a2744] rounded-2xl shadow-2xl overflow-y-auto overflow-x-hidden">
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#1a2744]">
           <div className="flex items-center gap-3">
@@ -138,6 +336,14 @@ export function AssetModal({ asset, onClose, onRequest }: { asset: Asset; onClos
 
         {/* Body */}
         <div className="px-4 sm:px-6 py-5 space-y-4">
+
+          {/* Success banner */}
+          {successMsg && (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3 text-xs text-emerald-400 font-medium">
+              {successMsg}
+            </div>
+          )}
+
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-white font-semibold text-base leading-tight">{asset.itemName}</p>
@@ -165,6 +371,55 @@ export function AssetModal({ asset, onClose, onRequest }: { asset: Asset; onClos
               </div>
             ))}
           </div>
+
+          {/* ── BORROWED: show borrow details, no borrow button ── */}
+          {asset.status === 'Borrowed' && (
+            <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-amber-400 text-xs font-semibold">This item is currently borrowed</p>
+              </div>
+              {loadingBorrow ? (
+                <div className="flex items-center gap-2 text-slate-500 text-xs">
+                  <div className="w-3 h-3 border-2 border-slate-600 border-t-slate-400 rounded-full animate-spin" />
+                  Loading borrow details...
+                </div>
+              ) : borrowDetails ? (
+                <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                  {[
+                    ['Borrower', borrowDetails.borrower_name],
+                    ['Designation', borrowDetails.borrower_designation || '—'],
+                    ['Since', borrowDetails.start_date],
+                    ['Due', borrowDetails.end_date || 'No due date'],
+                    ['Destination', borrowDetails.destination || '—'],
+                    ['Purpose', borrowDetails.purpose || '—'],
+                  ].map(([k, v]) => (
+                    <div key={k}>
+                      <span className="text-slate-600 text-[9px] uppercase tracking-widest font-semibold">{k}</span>
+                      <p className="text-slate-300 font-medium">{v}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-slate-500 text-xs">No active borrow record found for this asset.</p>
+              )}
+            </div>
+          )}
+
+          {/* ── SERVICEABLE: inline borrow form ── */}
+          {asset.status === 'Serviceable' && showBorrowForm && !successMsg && (
+            <div className="bg-[#0a1020] border border-blue-500/20 rounded-xl px-4 py-4">
+              <p className="text-blue-400 text-xs font-semibold mb-3 flex items-center gap-2">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                New Borrow Request — {asset.itemName}
+              </p>
+              <InlineBorrowForm asset={asset} onSuccess={handleBorrowSuccess} onCancel={() => setShowBorrowForm(false)} />
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -173,16 +428,7 @@ export function AssetModal({ asset, onClose, onRequest }: { asset: Asset; onClos
             Close
           </button>
           <button
-            onClick={() => {
-              // Print return slip inline
-              const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
-              const printWindow = window.open('', '_blank', 'width=750,height=900')
-              if (!printWindow) return
-              printWindow.document.write(`<!DOCTYPE html><html><head><title>Return Slip – ${asset.propertyNumber}</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#000;padding:28px 36px;background:#fff;}h1{font-size:14px;font-weight:900;text-align:center;letter-spacing:1px;margin-bottom:2px;}h2{font-size:11px;font-weight:700;text-align:center;margin-bottom:16px;color:#333;}.meta{display:flex;justify-content:space-between;margin-bottom:14px;}table{width:100%;border-collapse:collapse;margin-bottom:20px;}th{background:#f5f5f5;border:1px solid #ccc;padding:6px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.5px;text-align:left;}td{border:1px solid #ccc;padding:7px 8px;font-size:10px;}.label{font-weight:700;width:32%;color:#444;}.sig-row{display:flex;gap:40px;margin-top:32px;}.sig-box{flex:1;border-top:1px solid #000;padding-top:6px;font-size:9px;text-align:center;}footer{margin-top:20px;text-align:center;font-size:8px;color:#888;border-top:1px solid #eee;padding-top:8px;}@media print{@page{size:A4;margin:18mm 20mm;}}</style></head><body><h1>PHILIPPINE STATISTICS AUTHORITY</h1><h2>PROPERTY RETURN SLIP</h2><div class="meta"><span><strong>Date:</strong> ${today}</span><span><strong>Ref No.:</strong> RS-${asset.propertyNumber}</span></div><table><tr><td class="label">Item Name</td><td>${asset.itemName}</td></tr><tr><td class="label">Item Description</td><td>${asset.itemDescription || '—'}</td></tr><tr><td class="label">Property Number</td><td>${asset.propertyNumber}</td></tr><tr><td class="label">Asset Tag</td><td>${asset.assetTag}</td></tr><tr><td class="label">Serial Number</td><td>${asset.serialNumber}</td></tr><tr><td class="label">Equipment Category</td><td>${asset.equipmentCategory}</td></tr><tr><td class="label">Office / Location</td><td>${asset.location}</td></tr><tr><td class="label">Unit Cost</td><td>₱${asset.unitCost}</td></tr><tr><td class="label">Date Purchased</td><td>${asset.datePurchased}</td></tr><tr><td class="label">Status</td><td>${asset.status}</td></tr></table><p style="font-size:10px;margin-bottom:6px;">This certifies that the above-described property has been returned in the condition noted above.</p><div class="sig-row"><div class="sig-box"><div style="font-weight:700;font-size:11px;margin-bottom:2px;">&nbsp;</div><div>Returned By / Borrower</div><div style="color:#888;font-size:8px;">Signature over Printed Name / Date</div></div><div class="sig-box"><div style="font-weight:700;font-size:11px;margin-bottom:2px;">&nbsp;</div><div>Received By / Property Custodian</div><div style="color:#888;font-size:8px;">Signature over Printed Name / Date</div></div><div class="sig-box"><div style="font-weight:700;font-size:11px;margin-bottom:2px;">&nbsp;</div><div>Noted By / Division Chief</div><div style="color:#888;font-size:8px;">Signature over Printed Name / Date</div></div></div><footer>PSA Property Management System | Generated: ${today}</footer></body></html>`)
-              printWindow.document.close()
-              printWindow.focus()
-              setTimeout(() => { printWindow.print(); printWindow.close() }, 500)
-            }}
+            onClick={printReturnSlip}
             className="flex-1 px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white transition flex items-center justify-center gap-2"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -190,12 +436,19 @@ export function AssetModal({ asset, onClose, onRequest }: { asset: Asset; onClos
             </svg>
             Return Slip
           </button>
-          <button onClick={onRequest} className="flex-1 px-5 py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition shadow-lg shadow-blue-900/40 flex items-center justify-center gap-2">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            Request Item
-          </button>
+
+          {/* Only show Borrow button when asset is Serviceable and form not yet open */}
+          {asset.status === 'Serviceable' && !showBorrowForm && !successMsg && (
+            <button
+              onClick={() => setShowBorrowForm(true)}
+              className="flex-1 px-5 py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition shadow-lg shadow-blue-900/40 flex items-center justify-center gap-2"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              Borrow It
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -206,8 +459,6 @@ export function AssetModal({ asset, onClose, onRequest }: { asset: Asset; onClos
 export function QRCodeImage({ value, size = 96 }: { value: string; size?: number }) {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
-
-  // Load qrcode lib from CDN and render to canvas
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -217,7 +468,6 @@ export function QRCodeImage({ value, size = 96 }: { value: string; size?: number
 
     const loadAndRender = async () => {
       try {
-        // Try to load QRCode library from CDN
         if (!(window as any).QRCode) {
           await new Promise<void>((resolve, reject) => {
             const existing = document.querySelector('script[data-qrlib]')
@@ -230,14 +480,11 @@ export function QRCodeImage({ value, size = 96 }: { value: string; size?: number
             document.head.appendChild(s)
           })
         }
-
-        // Use a hidden div to generate QR then copy to canvas
         const container = document.createElement('div')
         container.style.position = 'fixed'
         container.style.left = '-9999px'
         document.body.appendChild(container)
-
-        const qr = new (window as any).QRCode(container, {
+        new (window as any).QRCode(container, {
           text: value,
           width: size * 2,
           height: size * 2,
@@ -245,10 +492,7 @@ export function QRCodeImage({ value, size = 96 }: { value: string; size?: number
           colorLight: '#FFFFFF',
           correctLevel: (window as any).QRCode.CorrectLevel.M,
         })
-
-        // Wait a tick for QRCode to render
         await new Promise(r => setTimeout(r, 100))
-
         const img = container.querySelector('img') as HTMLImageElement
         const canvas = canvasRef.current
         if (canvas && img && img.src) {
@@ -269,7 +513,6 @@ export function QRCodeImage({ value, size = 96 }: { value: string; size?: number
         setError(true)
       }
     }
-
     loadAndRender()
   }, [value, size])
 
@@ -290,9 +533,7 @@ export function QRCodeImage({ value, size = 96 }: { value: string; size?: number
         </div>
       )}
       {error && (
-        <div style={{ width: size, height: size }} className="bg-white border-2 border-black flex items-center justify-center text-[8px] font-bold text-black text-center p-1">
-          {/* QR generation failed — leave blank so only the QR placeholder shows */}
-        </div>
+        <div style={{ width: size, height: size }} className="bg-white border-2 border-black flex items-center justify-center text-[8px] font-bold text-black text-center p-1" />
       )}
     </div>
   )
@@ -306,87 +547,12 @@ export function PSAPropertyTag({ asset }: { asset: Asset | null }) {
     if (!asset) return
     const tagEl = tagRef.current
     if (!tagEl) return
-
     const printWindow = window.open('', '_blank', 'width=700,height=400')
     if (!printWindow) return
-
     const canvas = tagEl.querySelector('canvas') as HTMLCanvasElement
     let qrDataUrl = ''
     if (canvas) qrDataUrl = canvas.toDataURL('image/png')
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>PSA Property Tag - ${asset.propertyNumber}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          html, body { background: white; }
-          body { display: flex; align-items: flex-start; justify-content: center; padding: 20px; }
-          .tag { background: #FFE600; border: 2.5px solid #000; width: 420px; font-family: Arial, sans-serif; page-break-inside: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .tag-title { text-align: center; font-size: 11px; font-weight: 900; color: #000; border-bottom: 1.5px solid #000; padding: 3px 8px; letter-spacing: 0.5px; background: #FFE600; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .tag-body { display: flex; gap: 8px; padding: 4px 8px 4px; }
-          .tag-fields { flex: 1; }
-          .tag-row { display: flex; align-items: center; margin-bottom: 3px; }
-          .tag-label { font-size: 7.5px; font-weight: 900; color: #000; width: 62px; flex-shrink: 0; letter-spacing: 0.3px; text-transform: uppercase; }
-          .tag-value-box { flex: 1; border-bottom: 1.5px solid #000; min-height: 14px; font-size: 8px; color: #000; padding: 0 2px; display: flex; align-items: flex-end; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .tag-article-value { font-size: 9px; font-weight: 700; }
-          .tag-qr-area { display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 2px; width: 90px; padding-bottom: 2px; }
-          .tag-qr-img { width: 76px; height: 76px; border: 1.5px solid #000; display: block; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .tag-qr-label { font-size: 5.5px; font-weight: 900; color: #000; text-align: center; line-height: 1.2; letter-spacing: 0.2px; }
-          .tag-footer { text-align: center; font-size: 7.5px; font-weight: 900; color: #000; border-top: 1.5px solid #000; padding: 3px 8px; background: #FFE600; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          @media print {
-            @page { size: A4; margin: 10mm; }
-            body { padding: 0; }
-            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            .tag { page-break-inside: avoid; break-inside: avoid; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="tag">
-          <div class="tag-title">PSA PROPERTY</div>
-          <div class="tag-body">
-            <div class="tag-fields">
-              <div class="tag-row">
-                <span class="tag-label">ARTICLE</span>
-                <span class="tag-value-box tag-article-value">${asset.itemName.toUpperCase()} (${asset.equipmentCategory.toUpperCase()})</span>
-              </div>
-              <div class="tag-row">
-                <span class="tag-label">PROP No.</span>
-                <span class="tag-value-box">${asset.propertyNumber}</span>
-              </div>
-              <div class="tag-row">
-                <span class="tag-label">SERIAL No.</span>
-                <span class="tag-value-box">${asset.serialNumber}</span>
-              </div>
-              <div class="tag-row">
-                <span class="tag-label">OFFICE</span>
-                <span class="tag-value-box">${asset.location}</span>
-              </div>
-              <div class="tag-row">
-                <span class="tag-label">CUSTODIAN</span>
-                <span class="tag-value-box">${asset.custodian || ''}</span>
-              </div>
-              <div class="tag-row">
-                <span class="tag-label">COST</span>
-                <span class="tag-value-box">₱${asset.unitCost}</span>
-              </div>
-              <div class="tag-row">
-                <span class="tag-label">DATE</span>
-                <span class="tag-value-box">${asset.datePurchased}</span>
-              </div>
-            </div>
-            <div class="tag-qr-area">
-              ${qrDataUrl ? `<img class="tag-qr-img" src="${qrDataUrl}" />` : `<div class="tag-qr-img" style="background:#fff;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:bold;">${asset.serialNumber}</div>`}
-              <span class="tag-qr-label">INVENTORY COMMITTEE<br/>VALIDATION</span>
-            </div>
-          </div>
-          <div class="tag-footer">(DO NOT DETACH OR MUTILATE)</div>
-        </div>
-      </body>
-      </html>
-    `)
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>PSA Property Tag - ${asset.propertyNumber}</title><style>*{margin:0;padding:0;box-sizing:border-box;}html,body{background:white;}body{display:flex;align-items:flex-start;justify-content:center;padding:20px;}.tag{background:#FFE600;border:2.5px solid #000;width:420px;font-family:Arial,sans-serif;page-break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.tag-title{text-align:center;font-size:11px;font-weight:900;color:#000;border-bottom:1.5px solid #000;padding:3px 8px;letter-spacing:0.5px;background:#FFE600;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.tag-body{display:flex;gap:8px;padding:4px 8px 4px;}.tag-fields{flex:1;}.tag-row{display:flex;align-items:center;margin-bottom:3px;}.tag-label{font-size:7.5px;font-weight:900;color:#000;width:62px;flex-shrink:0;letter-spacing:0.3px;text-transform:uppercase;}.tag-value-box{flex:1;border-bottom:1.5px solid #000;min-height:14px;font-size:8px;color:#000;padding:0 2px;display:flex;align-items:flex-end;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.tag-article-value{font-size:9px;font-weight:700;}.tag-qr-area{display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:2px;width:90px;padding-bottom:2px;}.tag-qr-img{width:76px;height:76px;border:1.5px solid #000;display:block;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.tag-qr-label{font-size:5.5px;font-weight:900;color:#000;text-align:center;line-height:1.2;letter-spacing:0.2px;}.tag-footer{text-align:center;font-size:7.5px;font-weight:900;color:#000;border-top:1.5px solid #000;padding:3px 8px;background:#FFE600;-webkit-print-color-adjust:exact;print-color-adjust:exact;}@media print{@page{size:A4;margin:10mm;}body{padding:0;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}.tag{page-break-inside:avoid;break-inside:avoid;}}</style></head><body><div class="tag"><div class="tag-title">PSA PROPERTY</div><div class="tag-body"><div class="tag-fields"><div class="tag-row"><span class="tag-label">ARTICLE</span><span class="tag-value-box tag-article-value">${asset.itemName.toUpperCase()} (${asset.equipmentCategory.toUpperCase()})</span></div><div class="tag-row"><span class="tag-label">PROP No.</span><span class="tag-value-box">${asset.propertyNumber}</span></div><div class="tag-row"><span class="tag-label">SERIAL No.</span><span class="tag-value-box">${asset.serialNumber}</span></div><div class="tag-row"><span class="tag-label">OFFICE</span><span class="tag-value-box">${asset.location}</span></div><div class="tag-row"><span class="tag-label">CUSTODIAN</span><span class="tag-value-box">${asset.custodian || ''}</span></div><div class="tag-row"><span class="tag-label">COST</span><span class="tag-value-box">₱${asset.unitCost}</span></div><div class="tag-row"><span class="tag-label">DATE</span><span class="tag-value-box">${asset.datePurchased}</span></div></div><div class="tag-qr-area">${qrDataUrl ? `<img class="tag-qr-img" src="${qrDataUrl}" />` : `<div class="tag-qr-img" style="background:#fff;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:bold;">${asset.serialNumber}</div>`}<span class="tag-qr-label">INVENTORY COMMITTEE<br/>VALIDATION</span></div></div><div class="tag-footer">(DO NOT DETACH OR MUTILATE)</div></div></body></html>`)
     printWindow.document.close()
     printWindow.focus()
     setTimeout(() => { printWindow.print(); printWindow.close() }, 600)
@@ -394,98 +560,40 @@ export function PSAPropertyTag({ asset }: { asset: Asset | null }) {
 
   return (
     <div className="space-y-3">
-      {/* The Tag Preview */}
       <div ref={tagRef}>
-        <div
-          className="relative border-[2.5px] border-black rounded-sm overflow-hidden select-none"
-          style={{ background: '#FFE600', fontFamily: 'Arial, Helvetica, sans-serif', minWidth: 360 }}
-        >
-          {/* Title bar */}
-          <div className="text-center text-[10px] font-black text-black border-b-[1.5px] border-black py-[3px] tracking-wide">
-            PSA PROPERTY
-          </div>
-
-          {/* Body */}
+        <div className="relative border-[2.5px] border-black rounded-sm overflow-hidden select-none" style={{ background: '#FFE600', fontFamily: 'Arial, Helvetica, sans-serif', minWidth: 360 }}>
+          <div className="text-center text-[10px] font-black text-black border-b-[1.5px] border-black py-[3px] tracking-wide">PSA PROPERTY</div>
           <div className="flex gap-2 px-2 pt-1 pb-1">
-            {/* Left: fields */}
             <div className="flex-1 space-y-[3px]">
-              {/* ARTICLE */}
-              <div className="flex items-center gap-1">
-                <span className="text-[7px] font-black text-black uppercase w-[58px] shrink-0 tracking-tight">ARTICLE</span>
-                <div className="flex-1 border-b-[1.5px] border-black min-h-[14px] flex items-end pb-px">
-                  <span className="text-[9px] font-bold text-black">
-                    {asset ? `${asset.itemName.toUpperCase()} (${asset.equipmentCategory.toUpperCase()})` : ''}
-                  </span>
+              {[
+                ['ARTICLE', asset ? `${asset.itemName.toUpperCase()} (${asset.equipmentCategory.toUpperCase()})` : '', true],
+                ['PROP No.', asset?.propertyNumber || '', false],
+                ['SERIAL No.', asset?.serialNumber || '', false],
+                ['OFFICE', asset?.location || '', false],
+                ['CUSTODIAN', asset?.custodian || '', false],
+                ['COST', asset ? `₱${asset.unitCost}` : '', false],
+                ['DATE', asset?.datePurchased || '', false],
+              ].map(([label, value, bold]) => (
+                <div key={label as string} className="flex items-center gap-1">
+                  <span className="text-[7px] font-black text-black uppercase w-[58px] shrink-0 tracking-tight">{label}</span>
+                  <div className="flex-1 border-b-[1.5px] border-black min-h-[14px] flex items-end pb-px">
+                    <span className={`${bold ? 'text-[9px] font-bold' : 'text-[8px] font-semibold'} text-black`}>{value}</span>
+                  </div>
                 </div>
-              </div>
-              {/* PROP No. */}
-              <div className="flex items-center gap-1">
-                <span className="text-[7px] font-black text-black uppercase w-[58px] shrink-0 tracking-tight">PROP No.</span>
-                <div className="flex-1 border-b-[1.5px] border-black min-h-[14px] flex items-end pb-px">
-                  <span className="text-[8px] text-black font-semibold">{asset?.propertyNumber || ''}</span>
-                </div>
-              </div>
-              {/* SERIAL No. */}
-              <div className="flex items-center gap-1">
-                <span className="text-[7px] font-black text-black uppercase w-[58px] shrink-0 tracking-tight">SERIAL No.</span>
-                <div className="flex-1 border-b-[1.5px] border-black min-h-[14px] flex items-end pb-px">
-                  <span className="text-[8px] text-black font-semibold">{asset?.serialNumber || ''}</span>
-                </div>
-              </div>
-              {/* OFFICE */}
-              <div className="flex items-center gap-1">
-                <span className="text-[7px] font-black text-black uppercase w-[58px] shrink-0 tracking-tight">OFFICE</span>
-                <div className="flex-1 border-b-[1.5px] border-black min-h-[14px] flex items-end pb-px">
-                  <span className="text-[8px] text-black font-semibold">{asset?.location || ''}</span>
-                </div>
-              </div>
-              {/* CUSTODIAN */}
-              <div className="flex items-center gap-1">
-                <span className="text-[7px] font-black text-black uppercase w-[58px] shrink-0 tracking-tight">CUSTODIAN</span>
-                <div className="flex-1 border-b-[1.5px] border-black min-h-[14px] flex items-end pb-px">
-                  <span className="text-[8px] text-black font-semibold">{asset?.custodian || ''}</span>
-                </div>
-              </div>
-              {/* COST */}
-              <div className="flex items-center gap-1">
-                <span className="text-[7px] font-black text-black uppercase w-[58px] shrink-0 tracking-tight">COST</span>
-                <div className="flex-1 border-b-[1.5px] border-black min-h-[14px] flex items-end pb-px">
-                  <span className="text-[8px] text-black font-semibold">{asset ? `₱${asset.unitCost}` : ''}</span>
-                </div>
-              </div>
-              {/* DATE */}
-              <div className="flex items-center gap-1">
-                <span className="text-[7px] font-black text-black uppercase w-[58px] shrink-0 tracking-tight">DATE</span>
-                <div className="flex-1 border-b-[1.5px] border-black min-h-[14px] flex items-end pb-px">
-                  <span className="text-[8px] text-black font-semibold">{asset?.datePurchased || ''}</span>
-                </div>
-              </div>
+              ))}
             </div>
-
-            {/* Right: QR + validation text */}
             <div className="flex flex-col items-center justify-between gap-1 pb-1 w-[86px] shrink-0">
               <div className="border-[1.5px] border-black">
                 <QRCodeImage value={asset?.propertyNumber || ''} size={76} />
               </div>
-              <span className="text-[5.5px] font-black text-black text-center leading-tight tracking-tight">
-                INVENTORY COMMITTEE VALIDATION
-              </span>
+              <span className="text-[5.5px] font-black text-black text-center leading-tight tracking-tight">INVENTORY COMMITTEE VALIDATION</span>
             </div>
           </div>
-
-          {/* Footer */}
-          <div className="text-center text-[7.5px] font-black text-black border-t-[1.5px] border-black py-[3px] tracking-wide">
-            (DO NOT DETACH OR MUTILATE)
-          </div>
+          <div className="text-center text-[7.5px] font-black text-black border-t-[1.5px] border-black py-[3px] tracking-wide">(DO NOT DETACH OR MUTILATE)</div>
         </div>
       </div>
-
-      {/* Print button */}
       {asset && (
-        <button
-          onClick={handlePrint}
-          className="w-full py-2.5 rounded-xl text-sm font-semibold bg-yellow-400 hover:bg-yellow-300 text-black transition flex items-center justify-center gap-2 border-2 border-black/20"
-        >
+        <button onClick={handlePrint} className="w-full py-2.5 rounded-xl text-sm font-semibold bg-yellow-400 hover:bg-yellow-300 text-black transition flex items-center justify-center gap-2 border-2 border-black/20">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
           </svg>
@@ -497,86 +605,13 @@ export function PSAPropertyTag({ asset }: { asset: Asset | null }) {
 }
 
 // ─── Return Slip Component ─────────────────────────────────────────────────────
-// Renders a printable Return Slip populated entirely from the passed asset.
 export function ReturnSlip({ asset }: { asset: Asset }) {
   const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=750,height=900')
     if (!printWindow) return
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Return Slip – ${asset.propertyNumber}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; padding: 28px 36px; background: #fff; }
-          h1 { font-size: 14px; font-weight: 900; text-align: center; letter-spacing: 1px; margin-bottom: 2px; }
-          h2 { font-size: 11px; font-weight: 700; text-align: center; margin-bottom: 16px; color: #333; }
-          .meta { display: flex; justify-content: space-between; margin-bottom: 14px; }
-          .meta span { font-size: 10px; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-          th { background: #f5f5f5; border: 1px solid #ccc; padding: 6px 8px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
-          td { border: 1px solid #ccc; padding: 7px 8px; font-size: 10px; }
-          .label { font-weight: 700; width: 32%; color: #444; }
-          .sig-row { display: flex; gap: 40px; margin-top: 32px; }
-          .sig-box { flex: 1; border-top: 1px solid #000; padding-top: 6px; font-size: 9px; text-align: center; }
-          .sig-name { font-weight: 700; font-size: 11px; margin-bottom: 2px; }
-          .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 9px; font-weight: 700; border: 1px solid #999; }
-          .badge-serviceable { border-color: #22c55e; color: #16a34a; }
-          .badge-non { border-color: #ef4444; color: #dc2626; }
-          .badge-borrowed { border-color: #f59e0b; color: #d97706; }
-          footer { margin-top: 20px; text-align: center; font-size: 8px; color: #888; border-top: 1px solid #eee; padding-top: 8px; }
-          @media print { @page { size: A4; margin: 18mm 20mm; } }
-        </style>
-      </head>
-      <body>
-        <h1>PHILIPPINE STATISTICS AUTHORITY</h1>
-        <h2>PROPERTY RETURN SLIP</h2>
-        <div class="meta">
-          <span><strong>Date:</strong> ${today}</span>
-          <span><strong>Ref No.:</strong> RS-${asset.propertyNumber}</span>
-        </div>
-        <table>
-          <tr><td class="label">Item Name</td><td>${asset.itemName}</td></tr>
-          <tr><td class="label">Item Description</td><td>${asset.itemDescription || '—'}</td></tr>
-          <tr><td class="label">Property Number</td><td>${asset.propertyNumber}</td></tr>
-          <tr><td class="label">Asset Tag</td><td>${asset.assetTag}</td></tr>
-          <tr><td class="label">Serial Number</td><td>${asset.serialNumber}</td></tr>
-          <tr><td class="label">Equipment Category</td><td>${asset.equipmentCategory}</td></tr>
-          <tr><td class="label">Office / Location</td><td>${asset.location}</td></tr>
-          <tr><td class="label">Unit</td><td>${asset.unit}</td></tr>
-          <tr><td class="label">Unit Cost</td><td>₱${asset.unitCost}</td></tr>
-          <tr><td class="label">Date Purchased</td><td>${asset.datePurchased}</td></tr>
-          <tr><td class="label">Status</td><td>
-            <span class="badge ${asset.status === 'Serviceable' ? 'badge-serviceable' : asset.status === 'Non-Serviceable' ? 'badge-non' : 'badge-borrowed'}">
-              ${asset.status}
-            </span>
-          </td></tr>
-        </table>
-        <p style="font-size:10px;margin-bottom:6px;">This certifies that the above-described property has been returned in the condition noted above.</p>
-        <div class="sig-row">
-          <div class="sig-box">
-            <div class="sig-name">&nbsp;</div>
-            <div>Returned By / Borrower</div>
-            <div style="color:#888;font-size:8px;">Signature over Printed Name / Date</div>
-          </div>
-          <div class="sig-box">
-            <div class="sig-name">&nbsp;</div>
-            <div>Received By / Property Custodian</div>
-            <div style="color:#888;font-size:8px;">Signature over Printed Name / Date</div>
-          </div>
-          <div class="sig-box">
-            <div class="sig-name">&nbsp;</div>
-            <div>Noted By / Division Chief</div>
-            <div style="color:#888;font-size:8px;">Signature over Printed Name / Date</div>
-          </div>
-        </div>
-        <footer>PSA Property Management System &nbsp;|&nbsp; Generated: ${today}</footer>
-      </body>
-      </html>
-    `)
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Return Slip – ${asset.propertyNumber}</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#000;padding:28px 36px;background:#fff;}h1{font-size:14px;font-weight:900;text-align:center;letter-spacing:1px;margin-bottom:2px;}h2{font-size:11px;font-weight:700;text-align:center;margin-bottom:16px;color:#333;}.meta{display:flex;justify-content:space-between;margin-bottom:14px;}.meta span{font-size:10px;}table{width:100%;border-collapse:collapse;margin-bottom:20px;}th{background:#f5f5f5;border:1px solid #ccc;padding:6px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.5px;text-align:left;}td{border:1px solid #ccc;padding:7px 8px;font-size:10px;}.label{font-weight:700;width:32%;color:#444;}.sig-row{display:flex;gap:40px;margin-top:32px;}.sig-box{flex:1;border-top:1px solid #000;padding-top:6px;font-size:9px;text-align:center;}.sig-name{font-weight:700;font-size:11px;margin-bottom:2px;}.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;border:1px solid #999;}.badge-serviceable{border-color:#22c55e;color:#16a34a;}.badge-non{border-color:#ef4444;color:#dc2626;}.badge-borrowed{border-color:#f59e0b;color:#d97706;}footer{margin-top:20px;text-align:center;font-size:8px;color:#888;border-top:1px solid #eee;padding-top:8px;}@media print{@page{size:A4;margin:18mm 20mm;}}</style></head><body><h1>PHILIPPINE STATISTICS AUTHORITY</h1><h2>PROPERTY RETURN SLIP</h2><div class="meta"><span><strong>Date:</strong> ${today}</span><span><strong>Ref No.:</strong> RS-${asset.propertyNumber}</span></div><table><tr><td class="label">Item Name</td><td>${asset.itemName}</td></tr><tr><td class="label">Item Description</td><td>${asset.itemDescription || '—'}</td></tr><tr><td class="label">Property Number</td><td>${asset.propertyNumber}</td></tr><tr><td class="label">Asset Tag</td><td>${asset.assetTag}</td></tr><tr><td class="label">Serial Number</td><td>${asset.serialNumber}</td></tr><tr><td class="label">Equipment Category</td><td>${asset.equipmentCategory}</td></tr><tr><td class="label">Office / Location</td><td>${asset.location}</td></tr><tr><td class="label">Unit</td><td>${asset.unit}</td></tr><tr><td class="label">Unit Cost</td><td>₱${asset.unitCost}</td></tr><tr><td class="label">Date Purchased</td><td>${asset.datePurchased}</td></tr><tr><td class="label">Status</td><td><span class="badge ${asset.status === 'Serviceable' ? 'badge-serviceable' : asset.status === 'Non-Serviceable' ? 'badge-non' : 'badge-borrowed'}">${asset.status}</span></td></tr></table><p style="font-size:10px;margin-bottom:6px;">This certifies that the above-described property has been returned in the condition noted above.</p><div class="sig-row"><div class="sig-box"><div class="sig-name">&nbsp;</div><div>Returned By / Borrower</div><div style="color:#888;font-size:8px;">Signature over Printed Name / Date</div></div><div class="sig-box"><div class="sig-name">&nbsp;</div><div>Received By / Property Custodian</div><div style="color:#888;font-size:8px;">Signature over Printed Name / Date</div></div><div class="sig-box"><div class="sig-name">&nbsp;</div><div>Noted By / Division Chief</div><div style="color:#888;font-size:8px;">Signature over Printed Name / Date</div></div></div><footer>PSA Property Management System | Generated: ${today}</footer></body></html>`)
     printWindow.document.close()
     printWindow.focus()
     setTimeout(() => { printWindow.print(); printWindow.close() }, 500)
@@ -584,7 +619,6 @@ export function ReturnSlip({ asset }: { asset: Asset }) {
 
   return (
     <div className="bg-[#0a1020] border border-[#131f33] rounded-xl overflow-hidden">
-      {/* Header */}
       <div className="px-5 py-3.5 border-b border-[#1a2744] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-blue-600/15 border border-blue-500/25 rounded-lg flex items-center justify-center">
@@ -597,18 +631,13 @@ export function ReturnSlip({ asset }: { asset: Asset }) {
             <p className="text-slate-600 text-[10px]">{asset.propertyNumber} · {today}</p>
           </div>
         </div>
-        <button
-          onClick={handlePrint}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-blue-600 hover:bg-blue-500 text-white transition"
-        >
+        <button onClick={handlePrint} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-blue-600 hover:bg-blue-500 text-white transition">
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
           </svg>
           Print
         </button>
       </div>
-
-      {/* Preview rows */}
       <div className="px-5 py-4 grid grid-cols-2 gap-x-6 gap-y-2 text-[11px]">
         {[
           ['Item Name', asset.itemName],
@@ -631,8 +660,6 @@ export function ReturnSlip({ asset }: { asset: Asset }) {
           </div>
         ))}
       </div>
-
-      {/* Signature placeholders */}
       <div className="px-5 pb-5 grid grid-cols-3 gap-3 mt-2">
         {['Returned By / Borrower', 'Received By / Custodian', 'Noted By / Division Chief'].map(role => (
           <div key={role} className="border-t border-slate-600 pt-2 text-center">

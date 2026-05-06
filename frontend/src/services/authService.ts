@@ -114,6 +114,11 @@ export const updateAsset = async (assetSerialCode: string, assetData: any) => {
   return response.data
 }
 
+export const updateAssetByPropertyNumber = async (propertyNumber: string, assetData: any) => {
+  const response = await api.put(`/api/assets/by-property/${propertyNumber}`, assetData)
+  return response.data
+}
+
 export const deleteAsset = async (assetSerialCode: string) => {
   const response = await api.delete(`/api/assets/${assetSerialCode}`)
   return response.data

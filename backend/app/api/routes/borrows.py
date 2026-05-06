@@ -35,7 +35,9 @@ def create_borrow_request(data: BorrowRequestCreate, db: Session = Depends(get_d
     ).first()
     if asset:
         asset.status = "Borrowed"
-    # If asset not found we still allow the borrow — admin may have the record
+        print(f"✅ Asset {data.property_number} status set to Borrowed")
+    else:
+        print(f"⚠️ Asset {data.property_number} not found — borrow created without asset update")
 
     db.commit()
     db.refresh(borrow)

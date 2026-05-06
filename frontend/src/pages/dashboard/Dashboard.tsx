@@ -50,9 +50,9 @@ export default function Dashboard() {
   }, [assets])
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchData = async (showLoading = true) => {
       try {
-        setLoading(true)
+        if (showLoading) setLoading(true)
         const [assetsData, borrowsData] = await Promise.all([
           getAllAssets(),
           getAllBorrowRequests(),
@@ -64,10 +64,13 @@ export default function Dashboard() {
         console.error('Failed to fetch data:', err)
         setError(err.message || 'Failed to load dashboard data')
       } finally {
-        setLoading(false)
+        if (showLoading) setLoading(false)
       }
     }
-    fetchData()
+    fetchData(true)
+    // Auto-refresh every 30 seconds to keep status up to date
+    const interval = setInterval(() => fetchData(false), 30000)
+    return () => clearInterval(interval)
   }, [])
 
   const totalAssets = assets.length

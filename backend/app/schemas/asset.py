@@ -12,7 +12,7 @@ class AssetCreate(BaseModel):
     equipment_category: str
     location: str
     unit: Optional[str] = None
-    unit_cost: Optional[str] = None
+    unit_cost: Optional[float] = None
     date_purchased: Optional[str] = None
     status: Optional[str] = "Serviceable"
     custodian: Optional[str] = None
@@ -29,7 +29,7 @@ class AssetOut(BaseModel):
     equipment_category: str
     location: str
     unit: Optional[str] = None
-    unit_cost: Optional[str] = None
+    unit_cost: Optional[float] = None
     date_purchased: Optional[str] = None
     status: str
     custodian: Optional[str] = None
@@ -47,7 +47,7 @@ class AssetUpdate(BaseModel):
     equipment_category: Optional[str] = None
     location: Optional[str] = None
     unit: Optional[str] = None
-    unit_cost: Optional[str] = None
+    unit_cost: Optional[float] = None
     date_purchased: Optional[str] = None
     status: Optional[str] = None
     custodian: Optional[str] = None

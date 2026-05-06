@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Float
+from sqlalchemy import Column, Integer, String, DateTime, Float
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -16,7 +16,7 @@ class Asset(Base):
     equipment_category = Column(String, nullable=False)
     location = Column(String, nullable=False)
     unit = Column(String)
-    unit_cost = Column(String)
+    unit_cost = Column(Float)          # was String — fixed to Float for sorting & math
     date_purchased = Column(String)
     status = Column(String, nullable=False, default="Serviceable")
     custodian = Column(String)

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getAllAssets, getAllBorrowRequests, createBorrowRequest, updateAsset } from '../../services/authService'
+import { getAllAssets, getAllBorrowRequests, createBorrowRequest } from '../../services/authService'
 import { SearchableDropdown } from '../assets/assetComponents'
 import type { Asset } from '../assets/assetTypes'
 import { defaultEquipmentCategories, transformAsset } from '../assets/assetTypes'
@@ -307,12 +307,10 @@ export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
             })
           )
       )
-      // Flip each borrowed asset's status to 'Borrowed'
-      await Promise.all(
-        form.items
-          .filter(it => it.propertyNumber)
-          .map(item => updateAsset(item.propertyNumber, { status: 'Borrowed' }))
-      )
+      // Backend handles asset status update atomically — refresh asset list from server
+      const updatedAssets = await getAllAssets()
+      const transformedAssets = updatedAssets.map((asset: any) => transformAsset(asset))
+      setAssetList(transformedAssets)
 
       // Update local records state
       const newRecords: BorrowRecord[] = results.map(record => ({

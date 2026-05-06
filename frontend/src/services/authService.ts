@@ -29,32 +29,25 @@ export const requestAuthorization = async (
 ) => {
   const response = await api.post(
     '/api/auth/request-authorization',
-    { page, remarks: remarks || null },
-    { headers: { Authorization: `Bearer ${token}` } }
+    { page, remarks: remarks || null }
   )
   return response.data
 }
 
-// FIX: accepts `page` so the backend checks authorization for the specific page
 export const getAuthorizationStatus = async (token: string, page: string) => {
   const response = await api.get('/api/auth/authorization-status', {
     params: { page },
-    headers: { Authorization: `Bearer ${token}` },
   })
   return response.data
 }
 
 export const getPendingAuthorizations = async (token: string) => {
-  const response = await api.get('/api/auth/pending-authorizations', {
-    headers: { Authorization: `Bearer ${token}` }
-  })
+  const response = await api.get('/api/auth/pending-authorizations')
   return response.data
 }
 
 export const getAllAdmins = async (token: string) => {
-  const response = await api.get('/api/auth/all-admins', {
-    headers: { Authorization: `Bearer ${token}` }
-  })
+  const response = await api.get('/api/auth/all-admins')
   return response.data
 }
 
@@ -66,8 +59,7 @@ export const grantAuthorization = async (
 ) => {
   const response = await api.post(
     '/api/auth/grant-authorization',
-    { admin_id, days, request_id },
-    { headers: { Authorization: `Bearer ${token}` } }
+    { admin_id, days, request_id }
   )
   return response.data
 }
@@ -75,8 +67,7 @@ export const grantAuthorization = async (
 export const revokeAuthorization = async (token: string, admin_id: number) => {
   const response = await api.post(
     '/api/auth/revoke-authorization',
-    { admin_id },
-    { headers: { Authorization: `Bearer ${token}` } }
+    { admin_id }
   )
   return response.data
 }
@@ -84,8 +75,7 @@ export const revokeAuthorization = async (token: string, admin_id: number) => {
 export const rejectAuthorization = async (token: string, request_id: number) => {
   const response = await api.post(
     '/api/auth/reject-authorization',
-    { request_id },
-    { headers: { Authorization: `Bearer ${token}` } }
+    { request_id }
   )
   return response.data
 }
@@ -204,7 +194,7 @@ export const logoutUserWithActivity = async (userId: number, email: string, full
       await createActivityLog({
         user_id: 1, // Super admin typically has ID 1
         user_name: 'Super Admin',
-        email: 'super@admin.psa.gov.ph',
+        email: 'superadmin@psa.gov.ph',
         action: `User ${fullName} logged out`,
         target: email,
         log_type: 'login',

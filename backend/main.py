@@ -11,6 +11,7 @@ from app.models.activity_log import ActivityLog
 from sqlalchemy.orm import Session
 from app.core.security import hash_password
 import uvicorn
+import os
 
 Base.metadata.create_all(bind=engine)
 
@@ -21,7 +22,7 @@ def create_sample_accounts():
             db.add(User(
                 email="superadmin@psa.gov.ph",
                 full_name="Super Admin",
-                hashed_password=hash_password("superadmin123"),
+                hashed_password=hash_password(os.environ.get("SUPERADMIN_PASSWORD", "superadmin123")),
                 role="super admin"
             ))
 
@@ -29,7 +30,7 @@ def create_sample_accounts():
             db.add(User(
                 email="admin@psa.gov.ph",
                 full_name="Admin User",
-                hashed_password=hash_password("admin123"),
+                hashed_password=hash_password(os.environ.get("ADMIN_PASSWORD", "admin123")),
                 role="admin"
             ))
 
@@ -37,11 +38,14 @@ def create_sample_accounts():
             db.add(User(
                 email="user@psa.gov.ph",
                 full_name="Regular User",
-                hashed_password=hash_password("user123"),
+                hashed_password=hash_password(os.environ.get("USER_PASSWORD", "user123")),
                 role="user"
             ))
 
         db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
@@ -58,7 +62,6 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:3000",
         "https://psa-property-management-system.vercel.app",
-        "*"
     ],
     allow_credentials=True,
     allow_methods=["*"],

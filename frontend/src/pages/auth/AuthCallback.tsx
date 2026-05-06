@@ -44,8 +44,10 @@ export default function AuthCallback() {
             setAuthorizationExpiry(userData.authorization_expiry ?? null)
 
             if (userData.role === 'super admin' || userData.role === 'admin') {
+              setIsProcessing(false)
               navigate('/dashboard', { replace: true })
             } else if (userData.role === 'user') {
+              setIsProcessing(false)
               navigate('/user', { replace: true })
             } else {
               setIsProcessing(false)

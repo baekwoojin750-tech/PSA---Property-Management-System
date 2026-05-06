@@ -8,7 +8,7 @@ export const getBaseURL = () => {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return `http://localhost:8000`
   }
-  return `http://${window.location.hostname}:8000`
+  return `https://psa-backend-3lol.onrender.com`
 }
 
 const api = axios.create({

@@ -15,6 +15,8 @@ type DashboardBorrow = {
   status?: string | null
 }
 
+type DashboardErrorKind = 'api' | 'invalid-data' | 'unknown'
+
 const asText = (value: unknown) => (typeof value === 'string' ? value : '')
 
 const icons = {
@@ -37,6 +39,7 @@ export default function Dashboard() {
   const [borrows, setBorrows] = useState<DashboardBorrow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [errorKind, setErrorKind] = useState<DashboardErrorKind>('unknown')
 
   const [search, setSearch] = useState('')
   const [officeFilter, setOfficeFilter] = useState('All Office')
@@ -75,20 +78,39 @@ export default function Dashboard() {
         ])
 
         if (!Array.isArray(assetsData)) {
-          throw new Error('Assets response is not an array')
+          throw new Error('invalid-assets-response')
         }
         if (!Array.isArray(borrowsData)) {
-          throw new Error('Borrow requests response is not an array')
+          throw new Error('invalid-borrows-response')
         }
 
         setAssets(assetsData)
         setBorrows(borrowsData)
         setError(null)
+        setErrorKind('unknown')
       } catch (err: unknown) {
         console.error('Failed to fetch data:', err)
         setAssets([])
         setBorrows([])
-        setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
+
+        const message = err instanceof Error ? err.message : 'Failed to load dashboard data'
+        const isInvalidData =
+          message === 'invalid-assets-response' || message === 'invalid-borrows-response'
+        const isApiError =
+          typeof err === 'object' &&
+          err !== null &&
+          ('response' in err || 'request' in err)
+
+        if (isInvalidData) {
+          setErrorKind('invalid-data')
+          setError('Backend returned invalid dashboard data.')
+        } else if (isApiError) {
+          setErrorKind('api')
+          setError('Could not reach the dashboard backend.')
+        } else {
+          setErrorKind('unknown')
+          setError('Dashboard could not be loaded.')
+        }
       } finally {
         if (showLoading) setLoading(false)
       }
@@ -154,9 +176,39 @@ export default function Dashboard() {
   }
 
   if (error) {
+    const errorTitle =
+      errorKind === 'invalid-data'
+        ? 'Backend returned invalid dashboard data'
+        : errorKind === 'api'
+          ? 'Dashboard backend is unavailable'
+          : 'Dashboard could not be loaded'
+
+    const errorDescription =
+      errorKind === 'invalid-data'
+        ? 'The page loaded, but the backend response format was not usable for the dashboard.'
+        : errorKind === 'api'
+          ? 'The frontend is running, but the dashboard API request did not complete successfully.'
+          : 'Something unexpected happened while loading the dashboard.'
+
     return (
-      <div className="w-full px-6 py-10 text-center text-red-400 text-sm">
-        Error: {error}
+      <div className="max-w-7xl mx-auto px-4 pt-28 pb-10">
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6 sm:p-8">
+          <div className="flex items-start gap-4">
+            <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 text-red-300">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008ZM10.29 3.86 1.82 18a2.25 2.25 0 0 0 1.93 3.375h16.5A2.25 2.25 0 0 0 22.18 18L13.71 3.86a2.25 2.25 0 0 0-3.42 0Z" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-semibold text-white">{errorTitle}</h1>
+              <p className="mt-1 text-sm text-slate-300">{errorDescription}</p>
+              <p className="mt-3 text-sm text-red-200">{error}</p>
+              <p className="mt-4 text-xs text-slate-400">
+                This fallback keeps the page usable even when the live API or database response is not.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }

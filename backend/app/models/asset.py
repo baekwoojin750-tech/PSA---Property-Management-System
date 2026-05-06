@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float
+from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.sql import func
+
 from app.core.database import Base
 
 
@@ -16,7 +17,8 @@ class Asset(Base):
     equipment_category = Column(String, nullable=False)
     location = Column(String, nullable=False)
     unit = Column(String)
-    unit_cost = Column(Float)          # was String — fixed to Float for sorting & math
+    # Render/Postgres currently stores this column as varchar in production.
+    unit_cost = Column(String)
     date_purchased = Column(String)
     status = Column(String, nullable=False, default="Serviceable")
     custodian = Column(String)

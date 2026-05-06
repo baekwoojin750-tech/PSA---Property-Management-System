@@ -74,4 +74,4 @@ def root():
 if __name__ == "__main__":
     # Bind to 0.0.0.0 so ALL devices on the network can reach this server,
     # not just requests coming from 192.168.0.171 itself.
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000)

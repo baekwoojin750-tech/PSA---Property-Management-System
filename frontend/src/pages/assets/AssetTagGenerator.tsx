@@ -7,7 +7,7 @@ import { getAllAssets } from '../../services/authService'
 export function AssetTagGenerator() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [search, setSearch] = useState('')
-  const [open, setOpen] = useState(false)
+  const [, setOpen] = useState(false)
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
   const dropRef = useRef<HTMLDivElement>(null)

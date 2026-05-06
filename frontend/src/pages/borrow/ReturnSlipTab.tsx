@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import type { BorrowRecord } from './BorrowTab'
-import { getAllBorrowRequests, updateBorrowRequest, getAssetByPropertyNumber, updateAsset } from '../../services/authService'
+import { getAllBorrowRequests, updateBorrowRequest } from '../../services/authService'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function useBase64Image(src: string) {
@@ -228,18 +228,7 @@ export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps
         )
       }
 
-      // 2. Flip each asset status → Serviceable in the DB
-      for (const item of form.items) {
-        if (!item.propertyNumber) continue
-        try {
-          const assetData = await getAssetByPropertyNumber(item.propertyNumber)
-          await updateAsset(assetData.serial_code, { status: 'Serviceable' })
-        } catch {
-          console.warn(`Could not update status for asset ${item.propertyNumber}`)
-        }
-      }
-
-      // 3. Add entries to the returned records table
+      // Add entries to the returned records table.
       const newReturned: ReturnedRecord[] = form.items.map((item, idx) => ({
         id: `RT-${Date.now()}-${idx}`,
         borrowerId: form.linkedRecordId || '—',

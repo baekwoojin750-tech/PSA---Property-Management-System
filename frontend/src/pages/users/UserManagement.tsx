@@ -244,7 +244,6 @@ export default function UserManagement() {
   const [error, setError]           = useState<string | null>(null)
   const [search, setSearch]         = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
-  const [editTarget, setEditTarget] = useState<User | null>(null)
 
   // ── Get the current logged-in user's role from your auth store/context ──
   // Replace this with however you access the current user, e.g.:
@@ -284,7 +283,6 @@ export default function UserManagement() {
 
   // ── Edit user ─────────────────────────────────────────────────────────────
   const handleEdit = (user: User) => {
-    setEditTarget(user)
     // TODO: open your edit modal here, e.g. setEditModalOpen(true)
     console.log('Edit user:', user)
   }

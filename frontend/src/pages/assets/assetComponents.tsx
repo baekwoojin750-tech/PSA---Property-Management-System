@@ -3,13 +3,9 @@ import { createPortal } from 'react-dom'
 import type { Asset } from './assetTypes'
 import { statusColor } from './assetTypes'
 import {
-  getAllAssets,
   createBorrowRequest,
-  updateAsset,
-  getAssetByPropertyNumber,
   getActiveBorrowByProperty,
 } from '../../services/authService'
-import { transformAsset } from './assetTypes'
 
 // ─── Searchable Dropdown Component ───────────────────────────────────────────
 export function SearchableDropdown({ options, value, onChange, placeholder }: {
@@ -160,7 +156,7 @@ function InlineBorrowForm({
     setSubmitting(true)
     setError('')
     try {
-      // 1. Create the borrow request
+      // Backend creates the borrow request and marks the asset as Borrowed atomically.
       await createBorrowRequest({
         borrower_name: form.borrowerName,
         borrower_designation: form.borrowerDesignation,
@@ -169,20 +165,9 @@ function InlineBorrowForm({
         property_number: asset.propertyNumber,
         start_date: form.startDate,
         end_date: form.endDate || null,
-        status: 'Active',
         destination: form.destination,
         purpose: form.purpose,
-        borrowed_from_name: form.borrowedFromName,
       })
-
-      // 2. Flip the asset status → Borrowed (look up serial_code first via property_number)
-      try {
-        const assetData = await getAssetByPropertyNumber(asset.propertyNumber)
-        await updateAsset(assetData.serial_code, { status: 'Borrowed' })
-      } catch {
-        // Non-fatal — borrow request was saved; status update is best-effort
-        console.warn('Could not update asset status to Borrowed')
-      }
 
       onSuccess()
     } catch (err: any) {

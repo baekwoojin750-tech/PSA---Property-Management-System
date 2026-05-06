@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional
 
 
@@ -25,7 +25,7 @@ class AssetOut(BaseModel):
     item_description: Optional[str] = None
     asset_tag: Optional[str] = None
     serial_number: Optional[str] = None
-    serial_code: str
+    serial_code: Optional[str] = None
     equipment_category: str
     location: str
     unit: Optional[str] = None
@@ -34,8 +34,21 @@ class AssetOut(BaseModel):
     status: str
     custodian: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("unit_cost", mode="before")
+    @classmethod
+    def parse_unit_cost(cls, value):
+        if value in (None, ""):
+            return None
+        if isinstance(value, str):
+            value = value.replace(",", "").strip()
+            if not value:
+                return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
 
 
 class AssetUpdate(BaseModel):

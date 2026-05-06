@@ -16,14 +16,12 @@ export function AssetRegistration() {
   const [form, setForm] = useState(emptyForm)
   const [qrValue, setQrValue] = useState('')
   const [assets, setAssets] = useState<Asset[]>([])
-  const [equipmentCategories, setEquipmentCategories] = useState<string[]>(defaultEquipmentCategories)
-  const [loading, setLoading] = useState(true)
+  const [equipmentCategories] = useState<string[]>(defaultEquipmentCategories)
   const [search, setSearch] = useState('')
   const [locationFilter, setLocationFilter] = useState('All')
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
   const [page, setPage] = useState(1)
-  const [editingAssetId, setEditingAssetId] = useState<string | null>(null)
   const [editingPropertyNumber, setEditingPropertyNumber] = useState<string | null>(null)
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
@@ -34,7 +32,6 @@ export function AssetRegistration() {
   useEffect(() => {
     const fetchAssets = async () => {
       try {
-        setLoading(true)
         const data = await getAllAssets()
         const transformedAssets: Asset[] = data.map((asset: any) => transformAsset(asset))
         setAssets(transformedAssets)
@@ -42,7 +39,6 @@ export function AssetRegistration() {
         console.error('Failed to fetch assets:', err)
         setAssets([])
       } finally {
-        setLoading(false)
       }
     }
 
@@ -88,7 +84,6 @@ export function AssetRegistration() {
   const clearForm = () => {
     setForm(emptyForm)
     setQrValue('')
-    setEditingAssetId(null)
     setEditingPropertyNumber(null)
     setActiveMenuId(null)
     setMenuPos(null)
@@ -110,7 +105,6 @@ export function AssetRegistration() {
       custodian: asset.custodian || '',
     })
     setQrValue(asset.propertyNumber)
-    setEditingAssetId(asset.id)
     setEditingPropertyNumber(asset.propertyNumber)
     setActiveMenuId(null)
   }
@@ -177,7 +171,6 @@ export function AssetRegistration() {
     }
 
     try {
-      setLoading(true)
       if (editingPropertyNumber) {
         const updated = await updateAsset(editingPropertyNumber, payload)
         const transformed = transformAsset(updated)
@@ -207,7 +200,6 @@ export function AssetRegistration() {
         variant: 'danger',
       })
     } finally {
-      setLoading(false)
     }
   }
 

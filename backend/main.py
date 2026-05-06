@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from app.api.routes import auth, assets, borrows, activity_logs
+from app.core.config import settings
 from app.core.database import Base, engine, get_db
 from app.models.user import User
 from app.models.authorization_request import AuthorizationRequest
@@ -58,15 +60,21 @@ app = FastAPI(title="Property Management System", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "https://psa-property-management-system.vercel.app",
-    ],
+    allow_origins=settings.cors_origins_list,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    print(f"Unhandled error for {request.method} {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(assets.router, prefix="/api/assets", tags=["Assets"])

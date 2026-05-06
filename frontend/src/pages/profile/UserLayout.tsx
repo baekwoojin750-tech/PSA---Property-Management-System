@@ -11,7 +11,6 @@ type ActivePage   = 'profile' | 'activity' | 'borrow' | 'gatepass' | 'return'
 type LogType      = 'login' | 'logout' | 'profile' | 'request'
 
 type ActivityLog  = { id: number; action: string; detail: string; timestamp: string; type: LogType }
-type BorrowRecord = { id: number; item: string; purpose: string; borrowDate: string; returnDate: string; status: 'Pending' | 'Approved' | 'Returned' | 'Rejected' }
 type UploadedForm = { id: number; name: string; uploadedAt: string; url: string; size: string }
 
 // ─── Mock data (extend logs to 32 to test pagination) ────────────────────────
@@ -50,25 +49,11 @@ const mockLogs: ActivityLog[] = [
   { id: 32, action: 'Login',           detail: 'Signed in from Chrome · Windows',        timestamp: '2025-04-15 09:00 AM', type: 'login'   },
 ]
 
-const mockBorrows: BorrowRecord[] = [
-  { id: 1, item: 'Laptop Dell XPS 15',      purpose: 'Field work documentation', borrowDate: '2025-04-20', returnDate: '2025-04-25', status: 'Returned'  },
-  { id: 2, item: 'Canon DSLR Camera',       purpose: 'Community survey photos',  borrowDate: '2025-04-22', returnDate: '2025-04-28', status: 'Approved'  },
-  { id: 3, item: 'Projector Epson EB-S41',  purpose: 'Regional meeting',         borrowDate: '2025-04-28', returnDate: '2025-04-29', status: 'Pending'   },
-  { id: 4, item: 'External Hard Drive 2TB', purpose: 'Data backup',              borrowDate: '2025-04-10', returnDate: '2025-04-12', status: 'Returned'  },
-]
-
 const logTypeConfig: Record<LogType, { color: string; dot: string; label: string }> = {
   login:   { color: 'bg-blue-400/10 text-blue-400 border-blue-400/20',       dot: 'bg-blue-400',   label: 'Login'   },
   logout:  { color: 'bg-slate-400/10 text-slate-400 border-slate-400/20',    dot: 'bg-slate-400',  label: 'Logout'  },
   profile: { color: 'bg-purple-400/10 text-purple-400 border-purple-400/20', dot: 'bg-purple-400', label: 'Profile' },
   request: { color: 'bg-amber-400/10 text-amber-400 border-amber-400/20',    dot: 'bg-amber-400',  label: 'Request' },
-}
-
-const statusConfig: Record<BorrowRecord['status'], string> = {
-  Pending:  'bg-amber-400/10 text-amber-400 border-amber-400/20',
-  Approved: 'bg-blue-400/10 text-blue-400 border-blue-400/20',
-  Returned: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20',
-  Rejected: 'bg-red-400/10 text-red-400 border-red-400/20',
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -291,7 +276,6 @@ function FormUploadSection({
   const filtered = forms.filter(f =>
     f.name.toLowerCase().includes(search.toLowerCase())
   )
-  const totalPages = Math.ceil(filtered.length / UPLOAD_PER_PAGE)
   const paginated  = filtered.slice((page - 1) * UPLOAD_PER_PAGE, page * UPLOAD_PER_PAGE)
 
   // Reset to page 1 on search change

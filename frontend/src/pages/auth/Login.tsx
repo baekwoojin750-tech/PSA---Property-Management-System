@@ -1,0 +1,739 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { loginUser, registerUser } from '../../services/authService'
+import { getBaseURL } from '../../services/api'
+import { useAuthStore } from '../../stores/authStore'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+)
+
+export default function AuthPage() {
+  const navigate = useNavigate()
+  const { setToken, setRole, setUser, setAuthorizationExpiry } = useAuthStore()
+  const [isLogin, setIsLogin] = useState(true)
+
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
+  const [loginError, setLoginError] = useState('')
+  const [loginLoading, setLoginLoading] = useState(false)
+
+  const [regName, setRegName] = useState('')
+  const [regEmail, setRegEmail] = useState('')
+  const [regPassword, setRegPassword] = useState('')
+  const [regConfirm, setRegConfirm] = useState('')
+  const [regError, setRegError] = useState('')
+  const [regSuccess, setRegSuccess] = useState('')
+  const [regLoading, setRegLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
+
+  const handleLogin = async () => {
+    if (!loginEmail.endsWith('@psa.gov.ph')) {
+      setLoginError('Only @psa.gov.ph email addresses are allowed')
+      return
+    }
+    setLoginLoading(true)
+    setLoginError('')
+    try {
+      const data = await loginUser(loginEmail, loginPassword)
+      setToken(data.access_token)
+      setRole(data.role)
+      setUser({ id: data.id, email: data.email ?? loginEmail, full_name: data.full_name ?? '' })
+      setAuthorizationExpiry(data.authorization_expiry ?? null)
+      const role = data.role
+      if (role === 'super admin' || role === 'admin') navigate('/dashboard', { replace: true })
+      else if (role === 'user') navigate('/user', { replace: true })
+      else setLoginError('Unrecognized role. Contact your administrator.')
+    } catch (err: any) {
+      const apiUrl = getBaseURL()
+      const message =
+        err.code === 'ECONNABORTED'
+          ? `Login timed out. Make sure the backend is running and your phone can open ${apiUrl}.`
+          : err.code === 'ERR_NETWORK' || !err.response
+            ? `Cannot reach the backend server. On your phone, try opening ${apiUrl}. If it does not load, allow port 8000 through Windows Firewall or start the backend on 0.0.0.0.`
+            : err.response?.data?.detail || 'Invalid email or password'
+      setLoginError(message)
+    } finally {
+      setLoginLoading(false)
+    }
+  }
+
+  const handleRegister = async () => {
+    if (!regEmail.endsWith('@psa.gov.ph')) {
+      setRegError('Only @psa.gov.ph email addresses are allowed')
+      return
+    }
+    if (regPassword !== regConfirm) { setRegError('Passwords do not match'); return }
+    if (regPassword.length < 6) { setRegError('Password must be at least 6 characters'); return }
+    setRegLoading(true)
+    setRegError('')
+    try {
+      await registerUser(regEmail, regName, regPassword)
+      setRegSuccess('Account created! You can now sign in.')
+      setTimeout(() => { setIsLogin(true); setRegSuccess('') }, 2000)
+    } catch (err: any) {
+      setRegError(err.response?.data?.detail || 'Registration failed')
+    } finally {
+      setRegLoading(false)
+    }
+  }
+
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true)
+    setLoginError('')
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
+      if (error) setLoginError('Google sign-in failed. Try again.')
+    } catch {
+      setLoginError('Google sign-in failed. Try again.')
+    } finally {
+      setGoogleLoading(false)
+    }
+  }
+
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        .auth-root {
+          font-family: 'DM Sans', sans-serif;
+          min-height: 100vh;
+          background: #060d1f;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1.5rem;
+          position: relative;
+          overflow: hidden;
+        }
+
+        /* Ambient glows */
+        .glow-1 {
+          position: absolute;
+          width: 600px; height: 600px;
+          background: radial-gradient(circle, rgba(29,78,216,0.18) 0%, transparent 70%);
+          top: -150px; left: -100px;
+          pointer-events: none;
+        }
+        .glow-2 {
+          position: absolute;
+          width: 500px; height: 500px;
+          background: radial-gradient(circle, rgba(14,165,233,0.12) 0%, transparent 70%);
+          bottom: -100px; right: -100px;
+          pointer-events: none;
+        }
+        .grid-bg {
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+          background-size: 48px 48px;
+          pointer-events: none;
+        }
+
+        /* Card */
+        .card {
+          position: relative;
+          width: 100%;
+          max-width: 960px;
+          min-height: 580px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          border-radius: 24px;
+          overflow: hidden;
+          box-shadow: 0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06);
+        }
+
+        /* Left panel */
+        .panel-left {
+          background: linear-gradient(145deg, #0f2a6e 0%, #0a1f52 50%, #071540 100%);
+          padding: 3rem 2.5rem;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          position: relative;
+          overflow: hidden;
+        }
+        .panel-left::before {
+          content: '';
+          position: absolute;
+          width: 320px; height: 320px;
+          background: radial-gradient(circle, rgba(59,130,246,0.2) 0%, transparent 65%);
+          top: -60px; right: -60px;
+          pointer-events: none;
+        }
+        .panel-left::after {
+          content: '';
+          position: absolute;
+          width: 200px; height: 200px;
+          background: radial-gradient(circle, rgba(14,165,233,0.15) 0%, transparent 65%);
+          bottom: 40px; left: -40px;
+          pointer-events: none;
+        }
+
+        .logo-area {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          position: relative;
+          z-index: 1;
+        }
+        .logo-icon {
+          width: 48px; height: 48px;
+          background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
+          border: 1px solid rgba(255,255,255,0.2);
+          border-radius: 14px;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 22px;
+          backdrop-filter: blur(8px);
+          flex-shrink: 0;
+        }
+        .logo-text {
+          font-family: 'Playfair Display', serif;
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: #fff;
+          line-height: 1.3;
+        }
+        .logo-sub {
+          font-size: 0.65rem;
+          font-weight: 400;
+          color: rgba(147,197,253,0.8);
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          margin-top: 1px;
+        }
+
+        .panel-headline {
+          position: relative;
+          z-index: 1;
+        }
+        .panel-headline h2 {
+          font-family: 'Playfair Display', serif;
+          font-size: 2rem;
+          font-weight: 700;
+          color: #fff;
+          line-height: 1.2;
+          margin-bottom: 0.75rem;
+        }
+        .panel-headline p {
+          font-size: 0.82rem;
+          color: rgba(147,197,253,0.75);
+          line-height: 1.7;
+          max-width: 240px;
+        }
+
+        /* Access level badges */
+        .access-levels {
+          position: relative;
+          z-index: 1;
+        }
+        .access-label {
+          font-size: 0.6rem;
+          letter-spacing: 0.15em;
+          text-transform: uppercase;
+          color: rgba(147,197,253,0.5);
+          margin-bottom: 10px;
+        }
+        .access-badge {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 9px 12px;
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 10px;
+          margin-bottom: 6px;
+          transition: background 0.2s;
+        }
+        .badge-dot {
+          width: 7px; height: 7px;
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+        .badge-name {
+          font-size: 0.75rem;
+          font-weight: 500;
+          color: #fff;
+          flex: 1;
+        }
+        .badge-role {
+          font-size: 0.68rem;
+          color: rgba(147,197,253,0.6);
+        }
+
+        /* Right panel */
+        .panel-right {
+          background: #0b1628;
+          padding: 3rem 2.8rem;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .form-title {
+          font-family: 'Playfair Display', serif;
+          font-size: 1.75rem;
+          font-weight: 700;
+          color: #f1f5f9;
+          margin-bottom: 4px;
+        }
+        .form-subtitle {
+          font-size: 0.78rem;
+          color: #475569;
+          margin-bottom: 1.8rem;
+          font-weight: 300;
+        }
+
+        /* Google button */
+        .btn-google {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          padding: 11px 16px;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 12px;
+          color: #e2e8f0;
+          font-size: 0.83rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-family: 'DM Sans', sans-serif;
+          letter-spacing: 0.01em;
+        }
+        .btn-google:hover:not(:disabled) {
+          background: rgba(255,255,255,0.08);
+          border-color: rgba(255,255,255,0.18);
+          transform: translateY(-1px);
+        }
+        .btn-google:disabled { opacity: 0.5; cursor: not-allowed; }
+        .google-icon {
+          width: 18px; height: 18px;
+          flex-shrink: 0;
+        }
+
+        /* Divider */
+        .divider {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin: 1.2rem 0;
+        }
+        .divider-line {
+          flex: 1;
+          height: 1px;
+          background: rgba(255,255,255,0.07);
+        }
+        .divider-text {
+          font-size: 0.7rem;
+          color: #334155;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          white-space: nowrap;
+        }
+
+        /* Form fields */
+        .field { margin-bottom: 1rem; }
+        .field-label {
+          display: block;
+          font-size: 0.68rem;
+          font-weight: 500;
+          color: #475569;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          margin-bottom: 6px;
+        }
+        .field-input {
+          width: 100%;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 10px;
+          padding: 10px 14px;
+          font-size: 0.82rem;
+          color: #e2e8f0;
+          font-family: 'DM Sans', sans-serif;
+          outline: none;
+          transition: all 0.2s;
+        }
+        .field-input::placeholder { color: #1e3a5f; }
+        .field-input:focus {
+          border-color: rgba(59,130,246,0.5);
+          background: rgba(59,130,246,0.05);
+          box-shadow: 0 0 0 3px rgba(59,130,246,0.08);
+        }
+
+        /* Row */
+        .field-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 1.4rem;
+        }
+        .remember-label {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 0.75rem;
+          color: #475569;
+          cursor: pointer;
+        }
+        .remember-label input { accent-color: #3b82f6; }
+        .forgot-btn {
+          background: none;
+          border: none;
+          color: #3b82f6;
+          font-size: 0.73rem;
+          cursor: pointer;
+          font-family: 'DM Sans', sans-serif;
+          transition: color 0.2s;
+        }
+        .forgot-btn:hover { color: #60a5fa; }
+
+        /* Primary button */
+        .btn-primary {
+          width: 100%;
+          padding: 11px;
+          background: linear-gradient(135deg, #1d4ed8, #1e40af);
+          border: none;
+          border-radius: 12px;
+          color: #fff;
+          font-size: 0.85rem;
+          font-weight: 600;
+          cursor: pointer;
+          font-family: 'DM Sans', sans-serif;
+          transition: all 0.2s;
+          letter-spacing: 0.02em;
+          box-shadow: 0 4px 20px rgba(29,78,216,0.35);
+        }
+        .btn-primary:hover:not(:disabled) {
+          background: linear-gradient(135deg, #2563eb, #1d4ed8);
+          transform: translateY(-1px);
+          box-shadow: 0 6px 24px rgba(29,78,216,0.45);
+        }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Error / Success */
+        .alert-error {
+          background: rgba(239,68,68,0.08);
+          border: 1px solid rgba(239,68,68,0.2);
+          border-radius: 10px;
+          padding: 9px 12px;
+          font-size: 0.75rem;
+          color: #fca5a5;
+          margin-bottom: 1rem;
+        }
+        .alert-success {
+          background: rgba(34,197,94,0.08);
+          border: 1px solid rgba(34,197,94,0.2);
+          border-radius: 10px;
+          padding: 9px 12px;
+          font-size: 0.75rem;
+          color: #86efac;
+          margin-bottom: 1rem;
+        }
+
+        /* Tab switcher */
+        .tab-row {
+          display: flex;
+          gap: 4px;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.06);
+          border-radius: 12px;
+          padding: 4px;
+          margin-bottom: 1.8rem;
+        }
+        .tab-btn {
+          flex: 1;
+          padding: 8px;
+          border: none;
+          border-radius: 9px;
+          font-size: 0.78rem;
+          font-weight: 500;
+          cursor: pointer;
+          font-family: 'DM Sans', sans-serif;
+          transition: all 0.2s;
+        }
+        .tab-btn.active {
+          background: #1d4ed8;
+          color: #fff;
+          box-shadow: 0 2px 8px rgba(29,78,216,0.4);
+        }
+        .tab-btn:not(.active) {
+          background: transparent;
+          color: #475569;
+        }
+        .tab-btn:not(.active):hover { color: #94a3b8; }
+
+        .switch-text {
+          text-align: center;
+          font-size: 0.73rem;
+          color: #334155;
+          margin-top: 1.2rem;
+        }
+        .switch-btn {
+          background: none;
+          border: none;
+          color: #3b82f6;
+          cursor: pointer;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.73rem;
+        }
+        .switch-btn:hover { text-decoration: underline; }
+
+        .domain-hint {
+          font-size: 0.65rem;
+          color: #1e3a5f;
+          margin-top: 4px;
+          padding-left: 2px;
+        }
+
+        /* Scrollable register */
+        .register-scroll {
+          overflow-y: auto;
+          max-height: 420px;
+          padding-right: 4px;
+        }
+        .register-scroll::-webkit-scrollbar { width: 3px; }
+        .register-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+
+        @media (max-width: 700px) {
+          .card { grid-template-columns: 1fr; min-height: unset; }
+          .panel-left { display: none; }
+          .panel-right { padding: 2rem 1.5rem; }
+        }
+      `}</style>
+
+      <div className="auth-root">
+        <div className="glow-1" />
+        <div className="glow-2" />
+        <div className="grid-bg" />
+
+        <div className="card">
+          {/* LEFT PANEL */}
+          <div className="panel-left">
+            <div className="logo-area">
+              <div className="logo-icon">🏛️</div>
+              <div>
+                <div className="logo-text">PSA</div>
+                <div className="logo-sub">Philippine Statistics Authority</div>
+              </div>
+            </div>
+
+            <div className="panel-headline">
+              <h2>Property<br />Management<br />System</h2>
+              <p>Secure access portal for authorized PSA personnel only.</p>
+            </div>
+
+            <div className="access-levels">
+              <div className="access-label">Access Levels</div>
+              <div className="access-badge">
+                <span className="badge-dot" style={{ background: '#facc15' }} />
+                <span className="badge-name">Super Admin</span>
+                <span className="badge-role">Full access</span>
+              </div>
+              <div className="access-badge">
+                <span className="badge-dot" style={{ background: '#93c5fd' }} />
+                <span className="badge-name">Admin</span>
+                <span className="badge-role">Partial + authorized</span>
+              </div>
+              <div className="access-badge">
+                <span className="badge-dot" style={{ background: '#64748b' }} />
+                <span className="badge-name">User</span>
+                <span className="badge-role">Profile + Requests</span>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT PANEL */}
+          <div className="panel-right">
+
+            {/* Tab switcher */}
+            <div className="tab-row">
+              <button className={`tab-btn ${isLogin ? 'active' : ''}`} onClick={() => { setIsLogin(true); setLoginError(''); setRegError('') }}>
+                Sign In
+              </button>
+              <button className={`tab-btn ${!isLogin ? 'active' : ''}`} onClick={() => { setIsLogin(false); setLoginError(''); setRegError('') }}>
+                Register
+              </button>
+            </div>
+
+            {/* LOGIN FORM */}
+            {isLogin && (
+              <div>
+                <div className="form-title">Welcome back</div>
+                <div className="form-subtitle">Sign in to your PSA account</div>
+
+                {/* Google Login */}
+                <button className="btn-google" onClick={handleGoogleLogin} disabled={googleLoading}>
+                  <svg className="google-icon" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  {googleLoading ? 'Redirecting...' : 'Continue with Google'}
+                </button>
+
+                <div className="divider">
+                  <div className="divider-line" />
+                  <span className="divider-text">or sign in with email</span>
+                  <div className="divider-line" />
+                </div>
+
+                {loginError && <div className="alert-error">{loginError}</div>}
+
+                <div className="field">
+                  <label className="field-label">Email</label>
+                  <input
+                    className="field-input"
+                    type="email"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                    placeholder="yourname@psa.gov.ph"
+                  />
+                  <div className="domain-hint">Only @psa.gov.ph addresses accepted</div>
+                </div>
+
+                <div className="field">
+                  <label className="field-label">Password</label>
+                  <input
+                    className="field-input"
+                    type="password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                    placeholder="••••••••"
+                  />
+                </div>
+
+                <div className="field-row">
+                  <label className="remember-label">
+                    <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+                    Remember me
+                  </label>
+                  <button className="forgot-btn" onClick={() => navigate('/forgot-password')}>
+                    Forgot password?
+                  </button>
+                </div>
+
+                <button className="btn-primary" onClick={handleLogin} disabled={loginLoading}>
+                  {loginLoading ? 'Signing in...' : 'Sign In'}
+                </button>
+
+                <div className="switch-text">
+                  No account?{' '}
+                  <button className="switch-btn" onClick={() => setIsLogin(false)}>Register here</button>
+                </div>
+                <div style={{ textAlign: 'center', fontSize: '0.68rem', color: '#1e3a5f', marginTop: '6px' }}>
+                  Admin accounts are created by Super Admin only.
+                </div>
+              </div>
+            )}
+
+            {/* REGISTER FORM */}
+            {!isLogin && (
+              <div>
+                <div className="form-title">Create account</div>
+                <div className="form-subtitle">User registration — @psa.gov.ph only</div>
+
+                {/* Google Register */}
+                <button className="btn-google" onClick={handleGoogleLogin} disabled={googleLoading}>
+                  <svg className="google-icon" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  {googleLoading ? 'Redirecting...' : 'Sign up with Google'}
+                </button>
+
+                <div className="divider">
+                  <div className="divider-line" />
+                  <span className="divider-text">or register with email</span>
+                  <div className="divider-line" />
+                </div>
+
+                <div className="register-scroll">
+                  {regError && <div className="alert-error">{regError}</div>}
+                  {regSuccess && <div className="alert-success">{regSuccess}</div>}
+
+                  <div className="field">
+                    <label className="field-label">Full Name</label>
+                    <input
+                      className="field-input"
+                      type="text"
+                      value={regName}
+                      onChange={(e) => setRegName(e.target.value)}
+                      placeholder="Juan Dela Cruz"
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label className="field-label">Email</label>
+                    <input
+                      className="field-input"
+                      type="email"
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      placeholder="yourname@psa.gov.ph"
+                    />
+                    <div className="domain-hint">Only @psa.gov.ph addresses accepted</div>
+                  </div>
+
+                  <div className="field">
+                    <label className="field-label">Password</label>
+                    <input
+                      className="field-input"
+                      type="password"
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                  </div>
+
+                  <div className="field" style={{ marginBottom: '1.4rem' }}>
+                    <label className="field-label">Confirm Password</label>
+                    <input
+                      className="field-input"
+                      type="password"
+                      value={regConfirm}
+                      onChange={(e) => setRegConfirm(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                  </div>
+
+                  <button className="btn-primary" onClick={handleRegister} disabled={regLoading}>
+                    {regLoading ? 'Creating account...' : 'Create User Account'}
+                  </button>
+
+                  <div className="switch-text">
+                    Already have an account?{' '}
+                    <button className="switch-btn" onClick={() => setIsLogin(true)}>Sign in</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}

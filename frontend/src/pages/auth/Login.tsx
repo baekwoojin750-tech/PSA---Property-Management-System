@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { loginUser, registerUser } from '../../services/authService'
-import { getBaseURL } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
 import { createClient } from '@supabase/supabase-js'
 
@@ -48,12 +47,11 @@ export default function AuthPage() {
       else if (role === 'user') navigate('/user', { replace: true })
       else setLoginError('Unrecognized role. Contact your administrator.')
     } catch (err: any) {
-      const apiUrl = getBaseURL()
       const message =
         err.code === 'ECONNABORTED'
-          ? `Login timed out. Make sure the backend is running and your phone can open ${apiUrl}.`
+          ? `Login timed out. The server may be starting up, please wait 30 seconds and try again.`
           : err.code === 'ERR_NETWORK' || !err.response
-            ? `Cannot reach the backend server. On your phone, try opening ${apiUrl}. If it does not load, allow port 8000 through Windows Firewall or start the backend on 0.0.0.0.`
+            ? `Cannot reach the backend server. The server may be waking up (cold start). Please wait 30 seconds and try again.`
             : err.response?.data?.detail || 'Invalid email or password'
       setLoginError(message)
     } finally {

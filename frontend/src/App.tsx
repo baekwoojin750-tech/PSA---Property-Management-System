@@ -5,6 +5,7 @@ import AuthorizationGate from './components/AuthorizationGate'
 import { useAuthStore } from './stores/authStore'
 
 const AuthPage                = lazy(() => import('./pages/auth/Login'))
+const AccountDisabled         = lazy(() => import('./pages/auth/AccountDisabled'))
 const ForgotPassword          = lazy(() => import('./pages/auth/ForgotPassword'))
 const ResetPassword           = lazy(() => import('./pages/auth/ResetPassword'))
 const MainLayout              = lazy(() => import('./layouts/MainLayout'))
@@ -15,7 +16,6 @@ const Inventory               = lazy(() => import('./pages/inventory/Inventory')
 const Profile                 = lazy(() => import('./pages/profile/Profile'))
 const UserLayout              = lazy(() => import('./pages/profile/UserLayout'))   // user-only
 const UserManagement          = lazy(() => import('./pages/users/UserManagement'))
-const ActivityLogs            = lazy(() => import('./pages/activity-logs/ActivityLogs'))
 const AuthorizationManagement = lazy(() => import('./pages/authorization/AuthorizationManagement'))
 
 function App() {
@@ -28,6 +28,7 @@ function App() {
         {/* ── Public ── */}
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<AuthPage />} />
+        <Route path="/account-disabled" element={<AccountDisabled />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
@@ -85,14 +86,6 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['super admin']}>
               <UserManagement />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/activity-logs"
-          element={
-            <ProtectedRoute allowedRoles={['super admin']}>
-              <ActivityLogs />
             </ProtectedRoute>
           }
         />

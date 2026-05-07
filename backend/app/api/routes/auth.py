@@ -16,6 +16,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models.authorization_request import AuthorizationRequest
+from app.models.activity_log import ActivityLog
 from app.models.user import User
 from app.schemas.user import (
     ForgotPassword,
@@ -82,6 +83,16 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
             status_code=403,
             detail="Account is disabled or suspended. Request reactivation from the super admin.",
         )
+
+    db.add(ActivityLog(
+        user_id=user.id,
+        user_name=user.full_name,
+        email=user.email,
+        action="Logged in",
+        target=user.email,
+        log_type="login",
+    ))
+    db.commit()
 
     token = create_access_token({"sub": str(user.id), "email": user.email, "role": user.role})
     return {

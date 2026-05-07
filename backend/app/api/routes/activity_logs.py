@@ -11,9 +11,20 @@ router = APIRouter()
 
 
 @router.post("/create", response_model=ActivityLogOut)
-def create_activity_log(data: ActivityLogCreate, db: Session = Depends(get_db)):
-    """Create a new activity log"""
-    log = ActivityLog(**data.dict())
+def create_activity_log(
+    data: ActivityLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a new activity log for the authenticated user."""
+    log = ActivityLog(
+        user_id=current_user.id,
+        user_name=current_user.full_name,
+        email=current_user.email,
+        action=data.action,
+        target=data.target,
+        log_type=data.log_type,
+    )
     db.add(log)
     db.commit()
     db.refresh(log)
@@ -43,7 +54,7 @@ def get_my_activity_logs(
     )
 
 
-@router.get("/{log_id}", response_model=ActivityLogOut)
+@router.get("/{log_id:int}", response_model=ActivityLogOut)
 def get_activity_log(
     log_id: int,
     db: Session = Depends(get_db),

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import Navbar from '../../components/shared/Navbar'
+import { useAuthStore } from '../../stores/authStore'
 import { createAdminAccount, getAllUsers, toggleUserStatus } from '../../services/authService'
 
 type Role = 'super admin' | 'admin' | 'user'
@@ -13,6 +14,8 @@ type User = {
   is_active: boolean
   reactivation_requested: boolean
   created_at: string
+  avatar_url?: string
+  department?: string
 }
 
 const roleBadge: Record<Role, string> = {
@@ -109,8 +112,10 @@ function UserCard({
       {onToggleStatus ? <KebabMenu user={user} onToggleStatus={onToggleStatus} /> : null}
 
       <div className="relative">
-        <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-800 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-lg">
-          {getInitials(user.full_name)}
+        <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-800 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-lg overflow-hidden">
+          {user.avatar_url
+            ? <img src={user.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+            : getInitials(user.full_name)}
         </div>
         <span
           className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-[#080e1a] ${
@@ -185,6 +190,8 @@ function RoleSection({
 }
 
 export default function UserManagement() {
+  const { user: loggedInUser } = useAuthStore()
+
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -215,6 +222,24 @@ export default function UserManagement() {
   useEffect(() => {
     fetchUsers()
   }, [])
+
+  // Sync profile edits from the logged-in user back into the user cards
+  useEffect(() => {
+    if (!loggedInUser) return
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === loggedInUser.id
+          ? {
+              ...u,
+              full_name: loggedInUser.full_name ?? u.full_name,
+              email: loggedInUser.email ?? u.email,
+              avatar_url: loggedInUser.avatar_url ?? u.avatar_url,
+              department: loggedInUser.department ?? u.department,
+            }
+          : u
+      )
+    )
+  }, [loggedInUser?.id, loggedInUser?.full_name, loggedInUser?.email, loggedInUser?.avatar_url, loggedInUser?.department])
 
   const resetCreateForm = () => {
     setCreateName('')
@@ -322,6 +347,10 @@ export default function UserManagement() {
             {error}
           </div>
         ) : null}
+
+        <div className="bg-amber-400/10 border border-amber-400/20 rounded-xl px-4 py-3 text-sm text-amber-100/85">
+          Disabled accounts are redirected to an account-disabled notice at login. They can request reactivation or proceed to the Super Admin&apos;s Desk, and reactivation may take up to 3 business days.
+        </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">

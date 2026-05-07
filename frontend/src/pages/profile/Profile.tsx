@@ -1,39 +1,52 @@
-import { useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Navbar from '../../components/shared/Navbar'
 import { useAuthStore } from '../../stores/authStore'
+import { createActivityLog, getAllBorrowRequests, getMyActivityLogs } from '../../services/authService'
 
 type ActiveTab = 'activity' | 'requests'
 type RequestSubTab = 'borrow' | 'gatepass' | 'returnslip'
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-type ActivityLog = { id: number; action: string; detail: string; timestamp: string; type: 'login' | 'logout' | 'profile' | 'request' }
-type BorrowRecord = { id: number; item: string; purpose: string; borrowDate: string; returnDate: string; status: 'Pending' | 'Approved' | 'Returned' | 'Rejected' }
+type ActivityLogType = 'login' | 'logout' | 'asset' | 'request' | 'user' | 'system'
+type ActivityLog = { id: number; action: string; detail: string; timestamp: string; type: ActivityLogType }
+type ApiActivityLog = {
+  id: number
+  user_name: string
+  email: string
+  action: string
+  target: string
+  created_at: string
+  log_type: 'login' | 'asset' | 'request' | 'user' | 'system'
+}
+type BorrowRecord = { id: number; item: string; purpose: string; borrowDate: string; returnDate: string; status: 'Active' | 'Returned' | 'Overdue' }
+type ApiBorrowRecord = {
+  id: number
+  item_name: string
+  borrower_name: string
+  status: 'Active' | 'Returned' | 'Overdue'
+  start_date: string
+  end_date?: string | null
+  purpose?: string | null
+}
 type UploadedForm = { id: number; name: string; uploadedAt: string; url: string }
 
-const mockLogs: ActivityLog[] = [
-  { id: 1, action: 'Login',           detail: 'Signed in from Chrome · Windows',     timestamp: '2025-04-28 08:32 AM', type: 'login'   },
-  { id: 2, action: 'Edit Profile',    detail: 'Updated department field',              timestamp: '2025-04-27 03:15 PM', type: 'profile' },
-  { id: 3, action: 'Change Photo',    detail: 'Profile picture updated',              timestamp: '2025-04-27 03:10 PM', type: 'profile' },
-  { id: 4, action: 'Logout',          detail: 'Session ended',                        timestamp: '2025-04-26 05:00 PM', type: 'logout'  },
-  { id: 5, action: 'Login',           detail: 'Signed in from Firefox · macOS',       timestamp: '2025-04-26 08:45 AM', type: 'login'   },
-  { id: 6, action: 'Submit Request',  detail: 'Borrow request #BR-0012 submitted',    timestamp: '2025-04-25 02:30 PM', type: 'request' },
-  { id: 7, action: 'Logout',          detail: 'Session ended',                        timestamp: '2025-04-25 05:00 PM', type: 'logout'  },
-]
-
-const mockBorrows: BorrowRecord[] = [
-  { id: 1, item: 'Laptop Dell XPS 15',      purpose: 'Field work documentation', borrowDate: '2025-04-20', returnDate: '2025-04-25', status: 'Returned'  },
-  { id: 2, item: 'Canon DSLR Camera',       purpose: 'Community survey photos',  borrowDate: '2025-04-22', returnDate: '2025-04-28', status: 'Approved'  },
-  { id: 3, item: 'Projector Epson EB-S41',  purpose: 'Regional meeting',         borrowDate: '2025-04-28', returnDate: '2025-04-29', status: 'Pending'   },
-  { id: 4, item: 'External Hard Drive 2TB', purpose: 'Data backup',              borrowDate: '2025-04-10', returnDate: '2025-04-12', status: 'Returned'  },
-]
+const toProfileActivityLog = (log: ApiActivityLog): ActivityLog => {
+  const action = log.action || 'Activity'
+  return {
+    id: log.id,
+    action,
+    detail: log.target || log.email || log.user_name || 'No target recorded',
+    timestamp: new Date(log.created_at).toLocaleString(),
+    type: action.toLowerCase().includes('logout') ? 'logout' : log.log_type,
+  }
+}
 
 export default function Profile() {
-  const { user, role } = useAuthStore()
+  const { user, role, setUser } = useAuthStore()
 
   const [activeTab, setActiveTab]         = useState<ActiveTab>('activity')
   const [requestSubTab, setRequestSubTab] = useState<RequestSubTab>('borrow')
   const [isEditing, setIsEditing]         = useState(false)
-  const [avatarUrl, setAvatarUrl]         = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl]         = useState<string | null>(user?.avatar_url || null)
   const fileInputRef                      = useRef<HTMLInputElement>(null)
 
   // per-slot file inputs
@@ -44,8 +57,14 @@ export default function Profile() {
   const [borrowForms,   setBorrowForms]   = useState<UploadedForm[]>([])
   const [gatepassForms, setGatepassForms] = useState<UploadedForm[]>([])
   const [returnForms,   setReturnForms]   = useState<UploadedForm[]>([])
+  const [borrowRecords, setBorrowRecords] = useState<BorrowRecord[]>([])
+  const [borrowLoading, setBorrowLoading] = useState(false)
+  const [borrowError, setBorrowError] = useState('')
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([])
+  const [activityLoading, setActivityLoading] = useState(false)
+  const [activityError, setActivityError] = useState('')
 
-  const [form, setForm] = useState({ fullName: user?.full_name || '', email: user?.email || '', department: '' })
+  const [form, setForm] = useState({ fullName: user?.full_name || '', email: user?.email || '', department: user?.department || '' })
   const [saved, setSaved] = useState({ ...form })
 
   const roleLabel = role === 'super admin' ? 'Super Admin' : role === 'admin' ? 'Admin' : 'User'
@@ -59,10 +78,40 @@ export default function Profile() {
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) setAvatarUrl(URL.createObjectURL(file))
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const nextAvatar = String(reader.result || '')
+      setAvatarUrl(nextAvatar)
+      if (user) setUser({ ...user, avatar_url: nextAvatar })
+    }
+    reader.readAsDataURL(file)
   }
 
-  const handleSave   = () => { setSaved({ ...form }); setIsEditing(false) }
+  const handleSave = async () => {
+    setSaved({ ...form })
+    if (user) {
+      setUser({
+        ...user,
+        full_name: form.fullName,
+        email: form.email,
+        department: form.department,
+        avatar_url: avatarUrl || user.avatar_url || '',
+      })
+      try {
+        const log = await createActivityLog({
+          action: 'Updated profile',
+          target: form.email,
+          log_type: 'user',
+        })
+        setActivityLogs(prev => [toProfileActivityLog(log), ...prev])
+      } catch (err) {
+        console.error('Failed to log profile update:', err)
+      }
+    }
+    setIsEditing(false)
+  }
   const handleCancel = () => { setForm({ ...saved }); setIsEditing(false) }
 
   const handleFormUpload = (
@@ -87,19 +136,80 @@ export default function Profile() {
         : 'text-white border-b border-transparent pb-0.5 cursor-default'
     }`
 
-  const logTypeConfig: Record<ActivityLog['type'], { color: string; dot: string; icon: string }> = {
-    login:   { color: 'bg-blue-400/10 text-blue-400 border-blue-400/20',     dot: 'bg-blue-400',    icon: '→' },
-    logout:  { color: 'bg-slate-400/10 text-slate-400 border-slate-400/20', dot: 'bg-slate-400',   icon: '←' },
-    profile: { color: 'bg-purple-400/10 text-purple-400 border-purple-400/20', dot: 'bg-purple-400', icon: '✎' },
-    request: { color: 'bg-amber-400/10 text-amber-400 border-amber-400/20',  dot: 'bg-amber-400',  icon: '⬆' },
+  const logTypeConfig: Record<ActivityLogType, { color: string; dot: string; label: string }> = {
+    login:   { color: 'bg-blue-400/10 text-blue-400 border-blue-400/20',       dot: 'bg-blue-400',    label: 'Login' },
+    logout:  { color: 'bg-slate-400/10 text-slate-400 border-slate-400/20',    dot: 'bg-slate-400',   label: 'Logout' },
+    asset:   { color: 'bg-purple-400/10 text-purple-400 border-purple-400/20', dot: 'bg-purple-400',  label: 'Asset' },
+    request: { color: 'bg-amber-400/10 text-amber-400 border-amber-400/20',    dot: 'bg-amber-400',   label: 'Request' },
+    user:    { color: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20', dot: 'bg-emerald-400', label: 'User' },
+    system:  { color: 'bg-slate-400/10 text-slate-400 border-slate-400/20',    dot: 'bg-slate-400',   label: 'System' },
+  }
+  const statusConfig: Record<BorrowRecord['status'], string> = {
+    Active:   'bg-blue-400/10 text-blue-400 border-blue-400/20',
+    Returned: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20',
+    Overdue:  'bg-red-400/10 text-red-400 border-red-400/20',
   }
 
-  const statusConfig: Record<BorrowRecord['status'], string> = {
-    Pending:  'bg-amber-400/10 text-amber-400 border-amber-400/20',
-    Approved: 'bg-blue-400/10 text-blue-400 border-blue-400/20',
-    Returned: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20',
-    Rejected: 'bg-red-400/10 text-red-400 border-red-400/20',
-  }
+  useEffect(() => {
+    let active = true
+
+    const fetchActivityLogs = async () => {
+      try {
+        setActivityLoading(true)
+        setActivityError('')
+        const data: ApiActivityLog[] = await getMyActivityLogs()
+        if (!active) return
+        setActivityLogs(data.map(toProfileActivityLog))
+      } catch (err: any) {
+        if (!active) return
+        console.error('Failed to fetch profile activity logs:', err)
+        setActivityError(err.response?.data?.detail || err.message || 'Failed to load activity logs')
+        setActivityLogs([])
+      } finally {
+        if (active) setActivityLoading(false)
+      }
+    }
+
+    fetchActivityLogs()
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+
+    const fetchBorrowRecords = async () => {
+      try {
+        setBorrowLoading(true)
+        setBorrowError('')
+        const data: ApiBorrowRecord[] = await getAllBorrowRequests()
+        if (!active) return
+
+        const currentName = (user?.full_name || '').trim().toLowerCase()
+        const ownRecords = data
+          .filter(record => !currentName || record.borrower_name.trim().toLowerCase() === currentName)
+          .map(record => ({
+            id: record.id,
+            item: record.item_name,
+            purpose: record.purpose || 'No purpose recorded',
+            borrowDate: record.start_date,
+            returnDate: record.end_date || '—',
+            status: record.status,
+          }))
+
+        setBorrowRecords(ownRecords)
+      } catch (err: any) {
+        if (!active) return
+        console.error('Failed to fetch profile borrow records:', err)
+        setBorrowError(err.response?.data?.detail || err.message || 'Failed to load borrow records')
+        setBorrowRecords([])
+      } finally {
+        if (active) setBorrowLoading(false)
+      }
+    }
+
+    fetchBorrowRecords()
+    return () => { active = false }
+  }, [user?.full_name])
 
   // ─── Upload + Records section ─────────────────────────────────────────────
   const FormUploadSection = ({
@@ -283,7 +393,7 @@ export default function Profile() {
           <div className="bg-[#0a1120] border border-[#1a2744] rounded-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-[#1a2744] flex items-center justify-between">
               <p className="text-white font-semibold text-sm">Recent Activity</p>
-              <span className="text-xs text-slate-500">{mockLogs.length} events</span>
+              <span className="text-xs text-slate-500">{activityLogs.length} events</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -296,7 +406,19 @@ export default function Profile() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1a2744]">
-                  {mockLogs.map(log => (
+                  {activityLoading ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-10 text-center text-slate-600 text-sm">Loading activity logs...</td>
+                    </tr>
+                  ) : activityError ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-10 text-center text-red-400 text-sm">{activityError}</td>
+                    </tr>
+                  ) : activityLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-10 text-center text-slate-600 text-sm">No recent activity yet.</td>
+                    </tr>
+                  ) : activityLogs.map(log => (
                     <tr key={log.id} className="hover:bg-white/[0.02] transition-colors">
                       <td className="px-6 py-3.5">
                         <p className="text-white text-sm font-medium">{log.action}</p>
@@ -305,7 +427,7 @@ export default function Profile() {
                       <td className="px-6 py-3.5">
                         <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${logTypeConfig[log.type].color}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${logTypeConfig[log.type].dot}`} />
-                          {log.type.charAt(0).toUpperCase() + log.type.slice(1)}
+                          {logTypeConfig[log.type].label}
                         </span>
                       </td>
                       <td className="px-6 py-3.5 text-slate-400 text-xs font-mono">{log.timestamp}</td>
@@ -346,7 +468,7 @@ export default function Profile() {
                 <div className="bg-[#0a1120] border border-[#1a2744] rounded-2xl overflow-hidden">
                   <div className="px-6 py-4 border-b border-[#1a2744] flex items-center justify-between">
                     <p className="text-white font-semibold text-sm">Borrow Records</p>
-                    <span className="text-xs text-slate-500">{mockBorrows.length} requests</span>
+                    <span className="text-xs text-slate-500">{borrowRecords.length} requests</span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full">
@@ -360,7 +482,19 @@ export default function Profile() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#1a2744]">
-                        {mockBorrows.map(b => (
+                        {borrowLoading ? (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-10 text-center text-slate-600 text-sm">Loading borrow records...</td>
+                          </tr>
+                        ) : borrowError ? (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-10 text-center text-red-400 text-sm">{borrowError}</td>
+                          </tr>
+                        ) : borrowRecords.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-10 text-center text-slate-600 text-sm">No borrow records found.</td>
+                          </tr>
+                        ) : borrowRecords.map(b => (
                           <tr key={b.id} className="hover:bg-white/[0.02] transition-colors">
                             <td className="px-6 py-3.5 text-white text-sm font-medium">{b.item}</td>
                             <td className="px-6 py-3.5 text-slate-400 text-sm">{b.purpose}</td>

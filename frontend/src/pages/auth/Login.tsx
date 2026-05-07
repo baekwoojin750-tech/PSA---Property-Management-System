@@ -43,12 +43,18 @@ export default function AuthPage() {
       else if (role === 'user') navigate('/user', { replace: true })
       else setLoginError('Unrecognized role. Contact your administrator.')
     } catch (err: any) {
+      const detail = err.response?.data?.detail || ''
+      if (err.response?.status === 403 && /disabled|suspended/i.test(detail)) {
+        navigate('/account-disabled', { state: { email: loginEmail } })
+        return
+      }
+
       const message =
         err.code === 'ECONNABORTED'
           ? `Login timed out. The server may be starting up, please wait 30 seconds and try again.`
           : err.code === 'ERR_NETWORK' || !err.response
             ? `Cannot reach the backend server. The server may be waking up (cold start). Please wait 30 seconds and try again.`
-            : err.response?.data?.detail || 'Invalid email or password'
+            : detail || 'Invalid email or password'
       setLoginError(message)
     } finally {
       setLoginLoading(false)

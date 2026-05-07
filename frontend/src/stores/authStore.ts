@@ -1,7 +1,13 @@
 import { create } from 'zustand'
 
 
-type AuthUser = { id: number; email: string; full_name: string }
+type AuthUser = {
+  id: number
+  email: string
+  full_name: string
+  department?: string
+  avatar_url?: string
+}
 
 interface AuthState {
   token: string | null
@@ -25,6 +31,8 @@ const parseUser = (): AuthUser | null => {
       id: Number(user.id ?? 0),
       email: user.email ?? '',
       full_name: user.full_name ?? '',
+      department: user.department ?? '',
+      avatar_url: user.avatar_url ?? '',
     }
   } catch {
     return null
@@ -46,8 +54,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ role })
   },
   setUser: (user) => {
-    localStorage.setItem('user', JSON.stringify(user))
-    set({ user })
+    const current = get().user
+    const next =
+      current && current.id === user.id
+        ? { ...current, ...user }
+        : user
+    localStorage.setItem('user', JSON.stringify(next))
+    set({ user: next })
   },
   setAuthorizationExpiry: (expiry) => {
     if (expiry) {

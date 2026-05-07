@@ -1,59 +1,33 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
-import { logoutUserWithActivity } from '../../services/authService'
+import { createActivityLog, getMyActivityLogs, logoutUserWithActivity } from '../../services/authService'
 import BorrowTab from '../borrow/BorrowTab'
 import GatePassTab from '../borrow/GatepassTab'
 import ReturnSlipTab from '../borrow/ReturnSlipTab'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type ActivePage   = 'profile' | 'activity' | 'borrow' | 'gatepass' | 'return'
-type LogType      = 'login' | 'logout' | 'profile' | 'request'
+type ActivePage = 'profile' | 'activity' | 'borrow' | 'gatepass' | 'return'
+type LogType = 'login' | 'logout' | 'asset' | 'request' | 'user' | 'system'
 
-type ActivityLog  = { id: number; action: string; detail: string; timestamp: string; type: LogType }
+type ActivityLog = { id: number; action: string; detail: string; timestamp: string; type: LogType }
+type ApiActivityLog = {
+  id: number
+  user_name: string
+  email: string
+  action: string
+  target: string
+  created_at: string
+  log_type: 'login' | 'asset' | 'request' | 'user' | 'system'
+}
 type UploadedForm = { id: number; name: string; uploadedAt: string; url: string; size: string }
-
-// ─── Mock data (extend logs to 32 to test pagination) ────────────────────────
-const mockLogs: ActivityLog[] = [
-  { id:  1, action: 'Login',           detail: 'Signed in from Chrome · Windows',       timestamp: '2025-04-28 08:32 AM', type: 'login'   },
-  { id:  2, action: 'Edit Profile',    detail: 'Updated department field',               timestamp: '2025-04-27 03:15 PM', type: 'profile' },
-  { id:  3, action: 'Change Photo',    detail: 'Profile picture updated',                timestamp: '2025-04-27 03:10 PM', type: 'profile' },
-  { id:  4, action: 'Logout',          detail: 'Session ended',                          timestamp: '2025-04-26 05:00 PM', type: 'logout'  },
-  { id:  5, action: 'Login',           detail: 'Signed in from Firefox · macOS',         timestamp: '2025-04-26 08:45 AM', type: 'login'   },
-  { id:  6, action: 'Submit Request',  detail: 'Borrow request #BR-0012 submitted',      timestamp: '2025-04-25 02:30 PM', type: 'request' },
-  { id:  7, action: 'Logout',          detail: 'Session ended',                          timestamp: '2025-04-25 05:10 PM', type: 'logout'  },
-  { id:  8, action: 'Login',           detail: 'Signed in from Safari · iOS',            timestamp: '2025-04-24 09:00 AM', type: 'login'   },
-  { id:  9, action: 'Submit Request',  detail: 'Gate pass #GP-0008 submitted',           timestamp: '2025-04-24 11:20 AM', type: 'request' },
-  { id: 10, action: 'Edit Profile',    detail: 'Updated email address',                  timestamp: '2025-04-24 02:00 PM', type: 'profile' },
-  { id: 11, action: 'Logout',          detail: 'Session ended',                          timestamp: '2025-04-24 06:00 PM', type: 'logout'  },
-  { id: 12, action: 'Login',           detail: 'Signed in from Chrome · Linux',          timestamp: '2025-04-23 07:55 AM', type: 'login'   },
-  { id: 13, action: 'Submit Request',  detail: 'Return slip #RS-0003 submitted',         timestamp: '2025-04-23 10:15 AM', type: 'request' },
-  { id: 14, action: 'Edit Profile',    detail: 'Updated full name',                      timestamp: '2025-04-22 04:30 PM', type: 'profile' },
-  { id: 15, action: 'Login',           detail: 'Signed in from Edge · Windows',          timestamp: '2025-04-21 08:10 AM', type: 'login'   },
-  { id: 16, action: 'Logout',          detail: 'Session ended',                          timestamp: '2025-04-21 05:30 PM', type: 'logout'  },
-  { id: 17, action: 'Submit Request',  detail: 'Borrow request #BR-0015 submitted',      timestamp: '2025-04-20 01:45 PM', type: 'request' },
-  { id: 18, action: 'Login',           detail: 'Signed in from Chrome · Android',        timestamp: '2025-04-19 09:30 AM', type: 'login'   },
-  { id: 19, action: 'Edit Profile',    detail: 'Updated department field',               timestamp: '2025-04-19 11:00 AM', type: 'profile' },
-  { id: 20, action: 'Logout',          detail: 'Session ended',                          timestamp: '2025-04-19 06:00 PM', type: 'logout'  },
-  { id: 21, action: 'Login',           detail: 'Signed in from Firefox · Windows',       timestamp: '2025-04-18 08:05 AM', type: 'login'   },
-  { id: 22, action: 'Submit Request',  detail: 'Gate pass #GP-0010 submitted',           timestamp: '2025-04-18 10:50 AM', type: 'request' },
-  { id: 23, action: 'Logout',          detail: 'Session ended',                          timestamp: '2025-04-18 05:00 PM', type: 'logout'  },
-  { id: 24, action: 'Login',           detail: 'Signed in from Chrome · Windows',        timestamp: '2025-04-17 07:58 AM', type: 'login'   },
-  { id: 25, action: 'Edit Profile',    detail: 'Updated profile picture',                timestamp: '2025-04-17 09:20 AM', type: 'profile' },
-  { id: 26, action: 'Submit Request',  detail: 'Return slip #RS-0005 submitted',         timestamp: '2025-04-17 03:00 PM', type: 'request' },
-  { id: 27, action: 'Logout',          detail: 'Session ended',                          timestamp: '2025-04-17 06:15 PM', type: 'logout'  },
-  { id: 28, action: 'Login',           detail: 'Signed in from Safari · macOS',          timestamp: '2025-04-16 08:40 AM', type: 'login'   },
-  { id: 29, action: 'Submit Request',  detail: 'Borrow request #BR-0020 submitted',      timestamp: '2025-04-16 02:10 PM', type: 'request' },
-  { id: 30, action: 'Edit Profile',    detail: 'Changed notification preferences',       timestamp: '2025-04-16 04:00 PM', type: 'profile' },
-  { id: 31, action: 'Logout',          detail: 'Session ended',                          timestamp: '2025-04-16 05:45 PM', type: 'logout'  },
-  { id: 32, action: 'Login',           detail: 'Signed in from Chrome · Windows',        timestamp: '2025-04-15 09:00 AM', type: 'login'   },
-]
 
 const logTypeConfig: Record<LogType, { color: string; dot: string; label: string }> = {
   login:   { color: 'bg-blue-400/10 text-blue-400 border-blue-400/20',       dot: 'bg-blue-400',   label: 'Login'   },
   logout:  { color: 'bg-slate-400/10 text-slate-400 border-slate-400/20',    dot: 'bg-slate-400',  label: 'Logout'  },
-  profile: { color: 'bg-purple-400/10 text-purple-400 border-purple-400/20', dot: 'bg-purple-400', label: 'Profile' },
+  asset:   { color: 'bg-purple-400/10 text-purple-400 border-purple-400/20', dot: 'bg-purple-400', label: 'Asset'   },
   request: { color: 'bg-amber-400/10 text-amber-400 border-amber-400/20',    dot: 'bg-amber-400',  label: 'Request' },
+  user:    { color: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20', dot: 'bg-emerald-400', label: 'User' },
+  system:  { color: 'bg-slate-400/10 text-slate-400 border-slate-400/20',    dot: 'bg-slate-400',  label: 'System'  },
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -394,16 +368,55 @@ const LOG_TYPES: { value: LogType | 'all'; label: string }[] = [
   { value: 'all',     label: 'All Types' },
   { value: 'login',   label: 'Login'     },
   { value: 'logout',  label: 'Logout'    },
-  { value: 'profile', label: 'Profile'   },
+  { value: 'asset',   label: 'Asset'     },
   { value: 'request', label: 'Request'   },
+  { value: 'user',    label: 'User'      },
+  { value: 'system',  label: 'System'    },
 ]
 
+const toProfileActivityLog = (log: ApiActivityLog): ActivityLog => {
+  const action = log.action || 'Activity'
+  return {
+    id: log.id,
+    action,
+    detail: log.target || log.email || log.user_name || 'No target recorded',
+    timestamp: new Date(log.created_at).toLocaleString(),
+    type: action.toLowerCase().includes('logout') ? 'logout' : log.log_type,
+  }
+}
+
 function ActivityLogsSection() {
+  const [logs, setLogs]               = useState<ActivityLog[]>([])
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState<LogType | 'all'>('all')
   const [search, setSearch]         = useState('')
   const [page, setPage]             = useState(1)
 
-  const filtered = mockLogs.filter(log => {
+  useEffect(() => {
+    let active = true
+
+    const fetchLogs = async () => {
+      try {
+        setLoading(true)
+        const data: ApiActivityLog[] = await getMyActivityLogs()
+        if (!active) return
+        setLogs(data.map(toProfileActivityLog))
+        setError(null)
+      } catch (err: any) {
+        if (!active) return
+        console.error('Failed to fetch profile activity logs:', err)
+        setError(err.response?.data?.detail || err.message || 'Failed to load activity logs')
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    fetchLogs()
+    return () => { active = false }
+  }, [])
+
+  const filtered = logs.filter(log => {
     const matchType   = typeFilter === 'all' || log.type === typeFilter
     const matchSearch = log.action.toLowerCase().includes(search.toLowerCase()) ||
                         log.detail.toLowerCase().includes(search.toLowerCase())
@@ -472,7 +485,15 @@ function ActivityLogsSection() {
             </tr>
           </thead>
           <tbody className="divide-y divide-[#1a2744]">
-            {paginated.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-10 text-center text-slate-600 text-sm">Loading activity logs...</td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-10 text-center text-red-400 text-sm">{error}</td>
+              </tr>
+            ) : paginated.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-6 py-10 text-center text-slate-600 text-sm">No activity matches your filters.</td>
               </tr>
@@ -510,15 +531,15 @@ const NAV_ITEMS: { page: ActivePage; label: string; icon: (active: boolean) => R
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function UserLayout() {
   const navigate = useNavigate()
-  const { user, logout, role } = useAuthStore()
+  const { user, logout, role, setUser } = useAuthStore()
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activePage, setActivePage]   = useState<ActivePage>('profile')
 
   const [isEditing, setIsEditing] = useState(false)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatar_url || null)
   const fileInputRef              = useRef<HTMLInputElement>(null)
-  const [form, setForm]           = useState({ fullName: user?.full_name || '', email: user?.email || '', department: '' })
+  const [form, setForm]           = useState({ fullName: user?.full_name || '', email: user?.email || '', department: user?.department || '' })
   const [saved, setSaved]         = useState({ ...form })
 
   const borrowRef   = useRef<HTMLInputElement>(null)
@@ -533,9 +554,38 @@ export default function UserLayout() {
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) setAvatarUrl(URL.createObjectURL(file))
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const nextAvatar = String(reader.result || '')
+      setAvatarUrl(nextAvatar)
+      if (user) setUser({ ...user, avatar_url: nextAvatar })
+    }
+    reader.readAsDataURL(file)
   }
-  const handleSave   = () => { setSaved({ ...form }); setIsEditing(false) }
+  const handleSave = async () => {
+    setSaved({ ...form })
+    if (user) {
+      setUser({
+        ...user,
+        full_name: form.fullName,
+        email: form.email,
+        department: form.department,
+        avatar_url: avatarUrl || user.avatar_url || '',
+      })
+      try {
+        await createActivityLog({
+          action: 'Updated profile',
+          target: form.email,
+          log_type: 'user',
+        })
+      } catch (err) {
+        console.error('Failed to log profile update:', err)
+      }
+    }
+    setIsEditing(false)
+  }
   const handleCancel = () => { setForm({ ...saved }); setIsEditing(false) }
 
 
@@ -614,7 +664,7 @@ export default function UserLayout() {
           <button
             onClick={async () => {
               if (user?.id && user?.email && user?.full_name && role) {
-                await logoutUserWithActivity(user.id, user.email, user.full_name, role)
+                await logoutUserWithActivity(user.id, user.email, user.full_name)
               }
               logout()
               navigate('/login')

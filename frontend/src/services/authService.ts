@@ -183,9 +183,9 @@ export const deleteBorrowRequest = async (borrowId: number) => {
 // ── Activity Logs ─────────────────────────────────────────────────────────
 
 export const createActivityLog = async (logData: {
-  user_id: number
-  user_name: string
-  email: string
+  user_id?: number
+  user_name?: string
+  email?: string
   action: string
   target: string
   log_type: 'login' | 'asset' | 'request' | 'user' | 'system'

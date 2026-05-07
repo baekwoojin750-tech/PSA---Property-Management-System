@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Navbar from '../../components/shared/Navbar'
 import { getAllActivityLogs, getMyActivityLogs } from '../../services/authService'
+import { useAuthStore } from '../../stores/authStore'
 
 type Log = {
   id: number
@@ -29,19 +30,13 @@ const typeConfig: Record<string, { label: string; color: string; dot: string }> 
 
 const ROWS_PER_PAGE = 25
 
-// ─── Helper: read current user from localStorage ───────────────────────────
+// ─── Helper: read current user from Zustand store ─────────────────────────
+// Token is handled automatically by the api interceptor (api.ts) — no need
+// to read or pass it manually here.
 function getCurrentUser(): CurrentUser | null {
   try {
-    const raw = localStorage.getItem('user') // adjust key if yours differs
-    if (raw) return JSON.parse(raw)
-
-    // Fallback: some apps store fields individually
-    const role  = localStorage.getItem('role') as CurrentUser['role'] | null
-    const id    = localStorage.getItem('id')
-    const full_name = localStorage.getItem('full_name') ?? ''
-    const email = localStorage.getItem('email') ?? ''
-    if (role && id) return { id: Number(id), role, full_name, email }
-
+    const { user } = useAuthStore.getState()
+    if (user) return user as CurrentUser
     return null
   } catch {
     return null
@@ -92,8 +87,7 @@ export default function ActivityLogs() {
           // Super admin: fetch ALL logs in the system
           data = await getAllActivityLogs()
         } else {
-          // Admin & User: fetch only their own logs
-          // Pass the current user's ID so the backend filters accordingly
+          // Admin & User: fetch only their own logs (backend reads ID from JWT)
           data = await getMyActivityLogs()
         }
 

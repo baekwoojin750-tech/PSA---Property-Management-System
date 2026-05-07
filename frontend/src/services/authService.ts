@@ -40,7 +40,6 @@ export const requestAuthorization = async (
   return response.data
 }
 
-// FIX: accepts `page` so the backend checks authorization for the specific page
 export const getAuthorizationStatus = async (token: string, page: string) => {
   const response = await api.get('/api/auth/authorization-status', {
     params: { page },
@@ -183,13 +182,36 @@ export const deleteBorrowRequest = async (borrowId: number) => {
 
 // ── Activity Logs ─────────────────────────────────────────────────────────
 
-export const createActivityLog = async (logData: any) => {
+export const createActivityLog = async (logData: {
+  user_id: number
+  user_name: string
+  email: string
+  action: string
+  target: string
+  log_type: 'login' | 'asset' | 'request' | 'user' | 'system'
+}) => {
   const response = await api.post('/api/activity-logs/create', logData)
   return response.data
 }
 
+/**
+ * Super admin only — returns ALL logs in the system.
+ * Backend route: GET /api/activity-logs/all
+ * Token is attached automatically via the api interceptor.
+ */
 export const getAllActivityLogs = async () => {
   const response = await api.get('/api/activity-logs/all')
+  return response.data
+}
+
+/**
+ * Admin & User — returns only the caller's own logs.
+ * Backend reads user ID from the JWT — no ID in the URL.
+ * Backend route: GET /api/activity-logs/mine
+ * Token is attached automatically via the api interceptor.
+ */
+export const getMyActivityLogs = async () => {
+  const response = await api.get('/api/activity-logs/mine')
   return response.data
 }
 
@@ -198,40 +220,27 @@ export const getActivityLogById = async (logId: number) => {
   return response.data
 }
 
-export const getUserActivityLogs = async (userId: number) => {
-  const response = await api.get(`/api/activity-logs/user/${userId}`)
-  return response.data
-}
-
 // ── Logout with Activity Logging ────────────────────────────────────────────
 
-export const logoutUserWithActivity = async (userId: number, email: string, fullName: string, role: string) => {
+export const logoutUserWithActivity = async (
+  userId: number,
+  email: string,
+  fullName: string,
+) => {
   try {
-    // Create activity log for the current user
+    // Log the logout action for the user themselves — that's all we need.
+    // The super admin's /all route will already show this log since it fetches
+    // every user's logs. No need to duplicate it under a hardcoded super admin ID.
     await createActivityLog({
       user_id: userId,
       user_name: fullName,
-      email: email,
+      email,
       action: 'Logged out',
       target: email,
       log_type: 'login',
     })
-
-    // If user is admin, also create a log for super admin
-    if (role === 'admin' || role === 'super admin') {
-      // Create activity log for super admin (assuming super admin ID is 1 or we can fetch it)
-      // For now, we'll create a system log that super admin will see
-      await createActivityLog({
-        user_id: 1, // Super admin typically has ID 1
-        user_name: 'Super Admin',
-        email: 'super@admin.psa.gov.ph',
-        action: `User ${fullName} logged out`,
-        target: email,
-        log_type: 'login',
-      })
-    }
   } catch (error) {
     console.error('Failed to create logout activity log:', error)
-    // Don't throw error - logout should proceed even if logging fails
+    // Don't throw — logout should proceed even if logging fails
   }
 }

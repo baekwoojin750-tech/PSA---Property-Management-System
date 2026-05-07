@@ -12,7 +12,7 @@ router = APIRouter()
 
 @router.post("/create", response_model=ActivityLogOut)
 def create_activity_log(data: ActivityLogCreate, db: Session = Depends(get_db)):
-    """Create a new activity log (internal use — called by other routes)"""
+    """Create a new activity log"""
     log = ActivityLog(**data.dict())
     db.add(log)
     db.commit()
@@ -25,7 +25,7 @@ def get_all_activity_logs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_super_admin),  # 🔒 super admin only
 ):
-    """Get all activity logs in the system — super admin only"""
+    """Get all activity logs — super admin only"""
     return db.query(ActivityLog).order_by(ActivityLog.created_at.desc()).all()
 
 
@@ -34,7 +34,7 @@ def get_my_activity_logs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),  # 🔒 any authenticated user
 ):
-    """Get activity logs for the currently authenticated user (admin or regular user)"""
+    """Get activity logs for the currently authenticated user"""
     return (
         db.query(ActivityLog)
         .filter(ActivityLog.user_id == current_user.id)
@@ -47,15 +47,12 @@ def get_my_activity_logs(
 def get_activity_log(
     log_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),  # 🔒 authenticated users only
+    current_user: User = Depends(get_current_user),
 ):
-    """Get a single activity log by ID — only accessible if it belongs to the current user (or super admin)"""
+    """Get a single activity log — only accessible if it belongs to the current user or super admin"""
     log = db.query(ActivityLog).filter(ActivityLog.id == log_id).first()
     if not log:
         raise HTTPException(status_code=404, detail="Activity log not found")
-
-    # Super admin can view any log; others can only view their own
     if current_user.role != "super admin" and log.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
-
     return log

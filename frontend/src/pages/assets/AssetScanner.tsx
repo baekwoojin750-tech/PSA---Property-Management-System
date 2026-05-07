@@ -36,15 +36,8 @@ export function AssetScanner() {
     fetchAssets()
   }, [])
 
-  // Dynamically load jsQR
-  const loadJsQR = useCallback(() => new Promise<typeof import('jsqr')['default']>((resolve, reject) => {
-    if ((window as any).jsQR) { resolve((window as any).jsQR); return }
-    const s = document.createElement('script')
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js'
-    s.onload = () => resolve((window as any).jsQR)
-    s.onerror = () => reject(new Error('Failed to load jsQR'))
-    document.head.appendChild(s)
-  }), [])
+  // Load jsQR via npm package (install with: npm install jsqr)
+  const loadJsQR = useCallback(() => import('jsqr').then(m => m.default), [])
 
   const stopCamera = useCallback(() => {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)

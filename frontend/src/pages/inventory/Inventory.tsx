@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { statusColor as assetStatusColor, locations, defaultEquipmentCategories } from '../assets/assetTypes'
 import type { Asset } from '../assets/assetTypes'
 import type { BorrowRecord } from '../borrow/BorrowTab'
 import { getAllAssets, getAllBorrowRequests } from '../../services/authService'
+import { exportInventoryXLSX } from './exportInventory'
 
 // ─── Merged record for the unified table ─────────────────────────────────────
 interface InventoryRow {
@@ -151,6 +152,16 @@ export default function Inventory() {
   const [page, setPage] = useState(1)
   const PER_PAGE = 15
 
+  // ── Export CSV state ──
+  const [showExportPanel, setShowExportPanel] = useState(false)
+  const [exportPeriodType, setExportPeriodType] = useState<'all' | 'monthly' | 'yearly'>('yearly')
+  const [exportYear, setExportYear] = useState(new Date().getFullYear())
+  const [exportMonth, setExportMonth] = useState(new Date().getMonth() + 1)
+  const [exportStatusFilter, setExportStatusFilter] = useState<'all' | 'Serviceable' | 'Non-Serviceable' | 'Active' | 'Overdue' | 'Returned'>('all')
+  const [exportDateField, setExportDateField] = useState<'datePurchased' | 'borrowStart'>('datePurchased')
+  const [exportPanelPos, setExportPanelPos] = useState({ top: 0, right: 0 })
+  const exportBtnRef = useRef<HTMLButtonElement>(null)
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -262,12 +273,38 @@ export default function Inventory() {
 
   useEffect(() => { setPage(1) }, [search, locationFilter, categoryFilter, assetStatusFilter, activeTab])
 
+  // ── Export modal: Escape key + scroll lock ──
+  useEffect(() => {
+    if (!showExportPanel) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowExportPanel(false) }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prev
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [showExportPanel])
+
   const tabs = [
     { key: 'all',      label: 'All Assets',     count: allRows.length },
     { key: 'borrowed', label: 'Active Borrows',  count: borrowed },
     { key: 'overdue',  label: 'Overdue',         count: overdue },
     { key: 'returned', label: 'Returned',        count: returned },
   ] as const
+
+  // ── Export XLSX logic ──
+  const handleExportCSV = async () => {
+    await exportInventoryXLSX(allRows, {
+      periodType: exportPeriodType,
+      year: exportYear,
+      month: exportMonth,
+      statusFilter: exportStatusFilter,
+      dateField: exportDateField,
+      organization: 'Philippine Statistics Authority — Property Management Office',
+    })
+    setShowExportPanel(false)
+  }
 
   if (loading) {
     return (
@@ -395,18 +432,186 @@ export default function Inventory() {
               <span className="text-[10px] bg-slate-800 border border-slate-700 text-slate-400 px-2 py-0.5 rounded-full font-semibold">{filtered.length}</span>
             </div>
 
-            {/* Search */}
-            <div className="relative w-full sm:w-64">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search property no., item, borrower..."
-                className="w-full bg-[#0f1623] border border-[#1e2d45] rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition"
-              />
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {/* Search */}
+              <div className="relative flex-1 sm:w-64">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search property no., item, borrower..."
+                  className="w-full bg-[#0f1623] border border-[#1e2d45] rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition"
+                />
+              </div>
+
+              {/* Export Button */}
+              <div className="relative">
+                <button
+                  ref={exportBtnRef}
+                  onClick={() => {
+                    if (exportBtnRef.current) {
+                      const r = exportBtnRef.current.getBoundingClientRect()
+                      setExportPanelPos({ top: r.bottom + 8, right: window.innerWidth - r.right })
+                    }
+                    setShowExportPanel(p => !p)
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition whitespace-nowrap"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export XLSX
+                </button>
+
+                {/* Export Modal */}
+                {showExportPanel && (
+                  <div
+                    className="fixed inset-0 z-50 flex items-center justify-center"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)' }}
+                    onClick={e => { if (e.target === e.currentTarget) setShowExportPanel(false) }}
+                  >
+                    <div className="w-full max-w-sm mx-4 bg-[#0d1421] border border-[#1a2744] rounded-2xl shadow-2xl p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-white text-sm font-semibold">Export Options</span>
+                      <button onClick={() => setShowExportPanel(false)} className="text-slate-600 hover:text-slate-400 transition">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+
+                    {/* Period Type */}
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Time Period</p>
+                      <div className="flex gap-1">
+                        {(['all', 'monthly', 'yearly'] as const).map(t => (
+                          <button
+                            key={t}
+                            onClick={() => setExportPeriodType(t)}
+                            className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition capitalize ${
+                              exportPeriodType === t
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-[#0f1623] border border-[#1e2d45] text-slate-500 hover:text-white'
+                            }`}
+                          >
+                            {t === 'all' ? 'All Time' : t.charAt(0).toUpperCase() + t.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Year picker — shown for both monthly and yearly */}
+                    {exportPeriodType !== 'all' && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Year</p>
+                        <select
+                          value={exportYear}
+                          onChange={e => setExportYear(Number(e.target.value))}
+                          className="w-full bg-[#0f1623] border border-[#1e2d45] rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                        >
+                          {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                            <option key={y} value={y}>{y}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Month picker — only for monthly */}
+                    {exportPeriodType === 'monthly' && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Month</p>
+                        <select
+                          value={exportMonth}
+                          onChange={e => setExportMonth(Number(e.target.value))}
+                          className="w-full bg-[#0f1623] border border-[#1e2d45] rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                        >
+                          {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, i) => (
+                            <option key={m} value={i + 1}>{m}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Date field to filter on */}
+                    {exportPeriodType !== 'all' && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Filter By Date</p>
+                        <div className="flex gap-1">
+                          {([
+                            { value: 'datePurchased', label: 'Date Purchased' },
+                            { value: 'borrowStart',   label: 'Borrow Start' },
+                          ] as const).map(opt => (
+                            <button
+                              key={opt.value}
+                              onClick={() => setExportDateField(opt.value)}
+                              className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition ${
+                                exportDateField === opt.value
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-[#0f1623] border border-[#1e2d45] text-slate-500 hover:text-white'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Asset / Borrow Status */}
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Asset / Borrow Status</p>
+                      <select
+                        value={exportStatusFilter}
+                        onChange={e => setExportStatusFilter(e.target.value as any)}
+                        className="w-full bg-[#0f1623] border border-[#1e2d45] rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                      >
+                        <option value="all">All Assets</option>
+                        <option value="Serviceable">Serviceable</option>
+                        <option value="Non-Serviceable">Non-Serviceable</option>
+                        <option value="Active">Active Borrows</option>
+                        <option value="Overdue">Overdue</option>
+                        <option value="Returned">Returned</option>
+                      </select>
+                    </div>
+
+                    {/* Preview count */}
+                    <p className="text-[10px] text-slate-600 text-center">
+                      {(() => {
+                        const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December']
+                        const count = allRows.filter(row => {
+                          if (exportPeriodType !== 'all') {
+                            const rawDate = exportDateField === 'datePurchased' ? row.datePurchased : row.borrowStart
+                            if (!rawDate || rawDate === '—') return false
+                            const d = new Date(rawDate)
+                            if (isNaN(d.getTime())) return false
+                            if (exportPeriodType === 'yearly' && d.getFullYear() !== exportYear) return false
+                            if (exportPeriodType === 'monthly' && (d.getFullYear() !== exportYear || d.getMonth() + 1 !== exportMonth)) return false
+                          }
+                          if (exportStatusFilter !== 'all') {
+                            const assetStatuses = ['Serviceable', 'Non-Serviceable']
+                            if (assetStatuses.includes(exportStatusFilter)) return row.assetStatus === exportStatusFilter
+                            return row.borrowStatus === exportStatusFilter
+                          }
+                          return true
+                        }).length
+                        return `${count} row${count !== 1 ? 's' : ''} will be exported`
+                      })()}
+                    </p>
+
+                    <button
+                      onClick={handleExportCSV}
+                      className="w-full py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download XLSX
+                    </button>
+                  </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -480,9 +685,8 @@ export default function Inventory() {
                   </td>
                 </tr>
               ) : paginated.map((row, i) => (
-                <>
+                <Fragment key={row.propertyNumber + i}>
                   <tr
-                    key={row.propertyNumber + i}
                     onClick={() => setExpandedRow(expandedRow === row.propertyNumber + i ? null : row.propertyNumber + i)}
                     className={`border-b border-[#131f33] transition-colors cursor-pointer
                       ${expandedRow === row.propertyNumber + i ? 'bg-[#0f1a2e]' : i % 2 === 0 ? 'hover:bg-[#0f1a2e]' : 'bg-[#0a1120]/40 hover:bg-[#0f1a2e]'}
@@ -576,7 +780,7 @@ export default function Inventory() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

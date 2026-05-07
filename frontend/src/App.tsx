@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense, useEffect } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import AuthorizationGate from './components/AuthorizationGate'
 import { useAuthStore } from './stores/authStore'
@@ -18,11 +18,38 @@ const UserLayout              = lazy(() => import('./pages/profile/UserLayout'))
 const UserManagement          = lazy(() => import('./pages/users/UserManagement'))
 const AuthorizationManagement = lazy(() => import('./pages/authorization/AuthorizationManagement'))
 
+const pageTitles: Record<string, string> = {
+  '/login': 'Login',
+  '/account-disabled': 'Account Disabled',
+  '/forgot-password': 'Forgot Password',
+  '/reset-password': 'Reset Password',
+  '/dashboard': 'Dashboard',
+  '/inventory': 'Inventory',
+  '/asset': 'Assets',
+  '/request': 'Borrow Request',
+  '/profile': 'Profile',
+  '/user': 'User Portal',
+  '/users': 'User Management',
+  '/authorization': 'Authorization Management',
+}
+
+function PageTitle() {
+  const location = useLocation()
+
+  useEffect(() => {
+    const pageName = pageTitles[location.pathname] || 'App'
+    document.title = `PSA - Property Management System | ${pageName}`
+  }, [location.pathname])
+
+  return null
+}
+
 function App() {
   const { role } = useAuthStore()
 
   return (
     <Suspense fallback={<div className="flex items-center justify-center h-screen bg-[#080e1a]"><div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
+      <PageTitle />
       <Routes>
 
         {/* ── Public ── */}

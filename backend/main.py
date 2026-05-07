@@ -28,6 +28,28 @@ def ensure_user_columns():
     if "reactivation_requested" not in columns:
         statements.append("ALTER TABLE users ADD COLUMN reactivation_requested BOOLEAN DEFAULT FALSE")
 
+    if "department" not in columns:
+        statements.append("ALTER TABLE users ADD COLUMN IF NOT EXISTS department VARCHAR")
+
+    if "avatar_url" not in columns:
+        statements.append("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT")
+
+    if not statements:
+        return
+
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+
+
+def ensure_authorization_request_columns():
+    inspector = inspect(engine)
+    columns = {column["name"] for column in inspector.get_columns("authorization_requests")}
+    statements: list[str] = []
+
+    if "expires_at" not in columns:
+        statements.append("ALTER TABLE authorization_requests ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP")
+
     if not statements:
         return
 
@@ -72,6 +94,7 @@ def create_sample_accounts():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     ensure_user_columns()
+    ensure_authorization_request_columns()
     create_sample_accounts()
     yield
 
@@ -80,7 +103,7 @@ app = FastAPI(title="Property Management System", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origin_regex=r"(https://.*\.vercel\.app|http://localhost:\d+|http://127\.0\.0\.1:\d+|http://192\.168\.\d+\.\d+:\d+)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

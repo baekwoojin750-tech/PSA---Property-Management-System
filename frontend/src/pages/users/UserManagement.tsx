@@ -205,11 +205,27 @@ export default function UserManagement() {
   const [createLoading, setCreateLoading] = useState(false)
   const [createError, setCreateError] = useState('')
 
+  const mergeLoggedInUser = (list: User[]) => {
+    if (!loggedInUser) return list
+
+    return list.map((user) =>
+      user.id === loggedInUser.id
+        ? {
+            ...user,
+            full_name: loggedInUser.full_name || user.full_name,
+            email: loggedInUser.email || user.email,
+            avatar_url: loggedInUser.avatar_url ?? user.avatar_url,
+            department: loggedInUser.department ?? user.department,
+          }
+        : user
+    )
+  }
+
   const fetchUsers = async () => {
     try {
       setLoading(true)
       const data = await getAllUsers()
-      setUsers(data)
+      setUsers(mergeLoggedInUser(data))
       setError(null)
     } catch (err: any) {
       console.error('Failed to fetch users:', err)
@@ -226,19 +242,7 @@ export default function UserManagement() {
   // Sync profile edits from the logged-in user back into the user cards
   useEffect(() => {
     if (!loggedInUser) return
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === loggedInUser.id
-          ? {
-              ...u,
-              full_name: loggedInUser.full_name ?? u.full_name,
-              email: loggedInUser.email ?? u.email,
-              avatar_url: loggedInUser.avatar_url ?? u.avatar_url,
-              department: loggedInUser.department ?? u.department,
-            }
-          : u
-      )
-    )
+    setUsers((prev) => mergeLoggedInUser(prev))
   }, [loggedInUser?.id, loggedInUser?.full_name, loggedInUser?.email, loggedInUser?.avatar_url, loggedInUser?.department])
 
   const resetCreateForm = () => {

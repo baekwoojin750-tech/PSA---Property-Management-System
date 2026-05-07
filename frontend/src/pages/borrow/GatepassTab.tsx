@@ -56,9 +56,14 @@ interface GatePassRecord {
   recipientName: string;
   origin: string;
   destinationCity: string;
+  startDate: string;
+  endDate: string;
   purpose: string;
   requestedBy: string;
+  requestedByDesignation: string;
   approvedBy: string;
+  approvedByDesignation: string;
+  guardOnDuty: string;
   date: string;
   items: GatePassItem[];
 }
@@ -101,6 +106,8 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
   const [gatePassRecords, setGatePassRecords] = useState<GatePassRecord[]>([]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+  const [openActionId, setOpenActionId] = useState<string | null>(null);
   const [assetList, setAssetList] = useState<Asset[]>([]);
   const [equipmentCategories, setEquipmentCategories] = useState<string[]>(defaultEquipmentCategories);
   const PER_PAGE = 10;
@@ -188,6 +195,18 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
   <meta charset="utf-8" />
   <title>Gate Pass</title>
   <style>
+    @font-face {
+      font-family: 'Trajan Pro';
+      src: url('/fonts/trajan-pro/TrajanPro-Regular.ttf') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Trajan Pro';
+      src: url('/fonts/trajan-pro/TrajanPro-Bold.otf') format('opentype');
+      font-weight: 700 900;
+      font-style: normal;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     @page { size: A4 portrait; margin: 14mm 20mm; }
     html { height: 100%; }
@@ -208,7 +227,7 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
       <div>${psaImg}</div>
       <div style="text-align:center;line-height:1.4;">
         <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.18em;color:#555;">Republic of the Philippines</div>
-        <div style="font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em;">Philippine Statistics Authority</div>
+        <div style="font-family:'Trajan Pro','Times New Roman',serif;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em;">Philippine Statistics Authority</div>
         <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.14em;color:#555;">Davao del Sur Provincial Statistical Office</div>
       </div>
       <div style="display:flex;justify-content:flex-end;">${bagongImg}</div>
@@ -315,20 +334,81 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
   };
 
   const handleSubmit = () => {
+    if (editingRecordId) {
+      setGatePassRecords(prev => prev.map(record =>
+        record.id === editingRecordId
+          ? {
+              ...record,
+              recipientName: form.recipientName,
+              origin: form.origin,
+              destinationCity: form.destinationCity,
+              startDate: form.startDate,
+              endDate: form.endDate,
+              purpose: form.purpose,
+              requestedBy: form.requestedBy,
+              requestedByDesignation: form.requestedByDesignation,
+              approvedBy: form.approvedBy,
+              approvedByDesignation: form.approvedByDesignation,
+              guardOnDuty: form.guardOnDuty,
+              date: form.date,
+              items: form.items,
+            }
+          : record
+      ));
+      setEditingRecordId(null);
+      setForm(defaultData);
+      return;
+    }
+
     const newRecord: GatePassRecord = {
       id: `GP-${Date.now()}`,
       recipientName: form.recipientName,
       origin: form.origin,
       destinationCity: form.destinationCity,
+      startDate: form.startDate,
+      endDate: form.endDate,
       purpose: form.purpose,
       requestedBy: form.requestedBy,
+      requestedByDesignation: form.requestedByDesignation,
       approvedBy: form.approvedBy,
+      approvedByDesignation: form.approvedByDesignation,
+      guardOnDuty: form.guardOnDuty,
       date: form.date,
       items: form.items,
     };
     setGatePassRecords(prev => [newRecord, ...prev]);
     setForm(defaultData);
   };
+
+  const handleEditRecord = (record: GatePassRecord) => {
+    setEditingRecordId(record.id)
+    setOpenActionId(null)
+    setForm({
+      date: record.date,
+      recipientName: record.recipientName,
+      origin: record.origin,
+      destinationCity: record.destinationCity,
+      startDate: record.startDate || '',
+      endDate: record.endDate || '',
+      purpose: record.purpose,
+      items: record.items.map(item => ({ ...item })),
+      requestedBy: record.requestedBy,
+      requestedByDesignation: record.requestedByDesignation || '',
+      approvedBy: record.approvedBy,
+      approvedByDesignation: record.approvedByDesignation || defaultData.approvedByDesignation,
+      guardOnDuty: record.guardOnDuty || '',
+    })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleDeleteRecord = (record: GatePassRecord) => {
+    setOpenActionId(null)
+    setGatePassRecords(prev => prev.filter(item => item.id !== record.id))
+    if (editingRecordId === record.id) {
+      setEditingRecordId(null)
+      setForm(defaultData)
+    }
+  }
 
   const formatPropertyNumber = (value: string) => {
     const digits = value.replace(/\D/g, '')
@@ -580,14 +660,24 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
             </div>
             <div className={`space-y-3 ${form.items.length > 5 ? 'max-h-[520px] overflow-y-auto pr-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700' : ''}`}>
               {form.items.map((item, idx) => (
-                <div key={idx} className="grid grid-cols-1 sm:grid-cols-6 gap-3 bg-[#0a1120] border border-[#1a2744] rounded-xl p-3 relative">
-                  <div className="sm:col-span-2">
-                    <label className={labelClass}>Description (auto-filled / editable)</label>
-                    <input type="text" placeholder="Property/equipment description" value={item.description} onChange={e => setItem(idx, "description", e.target.value)} className={inputClass} />
+                <div key={idx} className="bg-[#0a1120] border border-[#1a2744] rounded-xl p-4 space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest">Item {idx + 1}</span>
+                    {form.items.length > 1 && (
+                      <button type="button" onClick={() => removeItem(idx)} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-300 transition">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        Remove
+                      </button>
+                    )}
                   </div>
-                  <div className="sm:col-span-2 grid grid-cols-1 gap-2">
-                    <div>
-                      <label className={labelClass}>Equipment Category (auto-filled)</label>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                    <div className="lg:col-span-5">
+                      <label className={labelClass}>Description</label>
+                      <input type="text" placeholder="Property/equipment description" value={item.description} onChange={e => setItem(idx, "description", e.target.value)} className={inputClass} />
+                    </div>
+                    <div className="lg:col-span-4">
+                      <label className={labelClass}>Equipment Category</label>
                       <SearchableDropdown
                         options={equipmentCategories}
                         value={item.equipmentCategory}
@@ -595,24 +685,22 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
                         placeholder="Select category"
                       />
                     </div>
-                    <div>
+                    <div className="lg:col-span-3">
                       <label className={labelClass}>Property No.</label>
                       <input type="text" placeholder="0000-00-000-000000" value={item.propertyNumber} onChange={e => setItem(idx, "propertyNumber", e.target.value)} className={inputClass} />
                     </div>
                   </div>
-                  <div className="sm:col-span-1">
-                    <label className={labelClass}>Destination</label>
-                    <input type="text" placeholder="Destination" value={item.destination} onChange={e => setItem(idx, "destination", e.target.value)} className={inputClass} />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelClass}>Destination</label>
+                      <input type="text" placeholder="Destination" value={item.destination} onChange={e => setItem(idx, "destination", e.target.value)} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Period Covered</label>
+                      <input type="text" placeholder="Auto from dates" value={item.periodCovered} onChange={e => setItem(idx, "periodCovered", e.target.value)} className={inputClass} />
+                    </div>
                   </div>
-                  <div className="sm:col-span-1">
-                    <label className={labelClass}>Period Covered (auto-calc)</label>
-                    <input type="text" placeholder="Auto from dates" value={item.periodCovered} onChange={e => setItem(idx, "periodCovered", e.target.value)} className={inputClass} />
-                  </div>
-                  {form.items.length > 1 && (
-                    <button type="button" onClick={() => removeItem(idx)} className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center rounded text-red-400 hover:bg-red-500/10 transition">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                  )}
                 </div>
               ))}
             </div>
@@ -621,8 +709,8 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
           {/* Actions */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-[#1a2744]">
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              <button type="button" onClick={() => setForm(defaultData)} className="w-full sm:w-auto px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-[#1a2744] border border-transparent hover:border-[#243357] transition">
-                Clear Form
+              <button type="button" onClick={() => { setForm(defaultData); setEditingRecordId(null) }} className="w-full sm:w-auto px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-[#1a2744] border border-transparent hover:border-[#243357] transition">
+                {editingRecordId ? 'Cancel Edit' : 'Clear Form'}
               </button>
               <button type="button" onClick={handlePrint} disabled={!isFormValid} className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition">
                 Print Gate Pass
@@ -632,7 +720,7 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              Submit Gate Pass
+              {editingRecordId ? 'Save Changes' : 'Submit Gate Pass'}
             </button>
           </div>
 
@@ -765,7 +853,7 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#1a2744]">
-                {['Gate Pass ID', 'Personnel', 'Origin', 'Destination', 'Purpose', 'Requested By', 'Approved By', 'Date'].map(h => (
+                {['Gate Pass ID', 'Personnel', 'Origin', 'Destination', 'Purpose', 'Requested By', 'Approved By', 'Date', ''].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-[10px] font-semibold text-slate-600 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -773,7 +861,7 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-14">
+                  <td colSpan={9} className="text-center py-14">
                     <div className="flex flex-col items-center gap-2">
                       <svg className="w-8 h-8 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
@@ -793,6 +881,26 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
                   <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{record.requestedBy}</td>
                   <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{record.approvedBy || '—'}</td>
                   <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{record.date}</td>
+                  <td className="px-4 py-3 text-right relative">
+                    <button
+                      type="button"
+                      onClick={() => setOpenActionId(openActionId === record.id ? null : record.id)}
+                      className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-[#1a2744] transition"
+                      aria-label="Record actions"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <circle cx="10" cy="4" r="1.5" />
+                        <circle cx="10" cy="10" r="1.5" />
+                        <circle cx="10" cy="16" r="1.5" />
+                      </svg>
+                    </button>
+                    {openActionId === record.id && (
+                      <div className="absolute right-4 top-10 z-30 w-32 overflow-hidden rounded-xl border border-[#1a2744] bg-[#0f1c35] shadow-2xl shadow-black/40">
+                        <button type="button" onClick={() => handleEditRecord(record)} className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-white/10 hover:text-white transition">Edit</button>
+                        <button type="button" onClick={() => handleDeleteRecord(record)} className="w-full px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10 transition">Delete</button>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

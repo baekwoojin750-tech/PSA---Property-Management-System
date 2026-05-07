@@ -104,6 +104,8 @@ export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps
   const [search, setSearch]           = useState('')
   const [page, setPage]               = useState(1)
   const [successBanner, setSuccessBanner] = useState(false)
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null)
+  const [openActionId, setOpenActionId] = useState<string | null>(null)
   const PER_PAGE = 10
 
   useEffect(() => {
@@ -215,6 +217,29 @@ export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps
     if (!isFormValid || submitting) return
     setSubmitting(true)
     try {
+      if (editingRecordId) {
+        const item = form.items[0]
+        setReturnedRecords(prev => prev.map(record =>
+          record.id === editingRecordId
+            ? {
+                ...record,
+                borrowerId: form.linkedRecordId || record.borrowerId,
+                returnedByName: form.returnedByName,
+                returnedByDesignation: form.returnedByDesignation,
+                borrowedFromName: form.borrowedFromName,
+                itemName: item.description,
+                propertyNumber: item.propertyNumber,
+                returnDate: item.dateTimeReturned,
+                purposeCompliance: form.purposeCompliance,
+                remarks: item.remarks,
+              }
+            : record
+        ))
+        setEditingRecordId(null)
+        setForm(emptyForm)
+        return
+      }
+
       // 1. Persist borrow record status → Returned in the DB
       if (form.linkedRecordId) {
         // ID is stored as "BR-<numeric_id>" — strip prefix to get the numeric id
@@ -254,35 +279,227 @@ export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps
   }
 
   const handlePrint = () => {
-    if (!printRef.current) return
     const printWindow = window.open('', '_blank', 'width=900,height=700')
     if (!printWindow) return
-    const content = printRef.current.innerHTML
-    printWindow.document.write(`
-      <html>
-      <head>
-        <title>Return Slip</title>
-        <style>
-          body { margin: 0; font-family: Arial, sans-serif; color: #000; background: #fff; }
-          * { box-sizing: border-box; }
-          img { max-width: 100%; height: auto; }
-          .return-slip { width: 100%; padding: 24px; background: #fff; }
-          table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-          th, td { border: 1px solid #000; padding: 6px 8px; vertical-align: top; }
-          th { font-size: 11px; font-weight: bold; text-align: center; }
-          @page { size: A4; margin: 0.5in; }
-          @media print { html, body { height: auto !important; overflow: visible !important; } }
-        </style>
-      </head>
-      <body>
-        <div class="return-slip">${content}</div>
-      </body>
-      </html>
-    `)
+
+    const psaSrc = psaLogo || ''
+    const bagongSrc = bagongLogo || ''
+    const isoSrc = isoFooter || ''
+
+    const psaImg = psaSrc
+      ? '<img src="' + psaSrc + '" style="width:72px;height:72px;object-fit:contain;display:block;" />'
+      : ''
+
+    const bagongImg = bagongSrc
+      ? '<img src="' + bagongSrc + '" style="width:72px;height:72px;object-fit:contain;display:block;" />'
+      : ''
+
+    const isoImg = isoSrc
+      ? '<img src="' + isoSrc + '" style="max-height:48px;object-fit:contain;object-position:left;" />'
+      : '<span style="font-size:8px;color:#888;">3rd Floor JM Agro Building, Gov. Sales St., Davao City, Philippines 8000</span>'
+
+    const escapeHtml = (value: string) =>
+      value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+
+    const formatDateTime = (value: string) => escapeHtml(value.replace('T', ' '))
+    const slipItems = form.items.filter(it => it.description && it.propertyNumber)
+    const itemRows = slipItems.map(item =>
+      '<tr>' +
+        '<td style="border:1px solid #000;padding:5px 8px;font-size:11px;font-weight:700;vertical-align:middle;">' + escapeHtml(item.description) + '</td>' +
+        '<td style="border:1px solid #000;padding:5px 8px;font-size:11px;text-align:center;vertical-align:middle;">' + escapeHtml(item.propertyNumber) + '</td>' +
+        '<td style="border:1px solid #000;padding:5px 8px;font-size:11px;text-align:center;vertical-align:middle;">' + formatDateTime(item.dateTimeReturned) + '</td>' +
+        '<td style="border:1px solid #000;padding:5px 8px;font-size:11px;vertical-align:middle;">' + escapeHtml(item.remarks || '') + '</td>' +
+      '</tr>'
+    ).join('')
+
+    const emptyRows = Array.from({ length: Math.max(0, 8 - slipItems.length) }).map(() =>
+      '<tr>' +
+        '<td style="border:1px solid #000;height:32px;"></td>' +
+        '<td style="border:1px solid #000;"></td>' +
+        '<td style="border:1px solid #000;"></td>' +
+        '<td style="border:1px solid #000;"></td>' +
+      '</tr>'
+    ).join('')
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Return Slip</title>
+  <style>
+    @font-face {
+      font-family: 'Trajan Pro';
+      src: url('/fonts/trajan-pro/TrajanPro-Regular.ttf') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Trajan Pro';
+      src: url('/fonts/trajan-pro/TrajanPro-Bold.otf') format('opentype');
+      font-weight: 700 900;
+      font-style: normal;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    @page { size: A4 portrait; margin: 14mm 20mm; }
+    html { height: 100%; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #000; background: #fff; min-height: 100%; display: flex; flex-direction: column; }
+    #content { flex: 1; }
+    #footer { margin-top: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #000; padding: 6px 8px; vertical-align: middle; }
+    th { font-size: 11px; font-weight: bold; text-align: center; line-height: 1.2; }
+    @media print { html, body { height: 100% !important; } }
+  </style>
+</head>
+<body>
+  <div id="content">
+    <div style="display:grid;grid-template-columns:80px 1fr 80px;align-items:center;margin-bottom:2mm;">
+      <div>${psaImg}</div>
+      <div style="text-align:center;line-height:1.4;">
+        <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.18em;color:#555;">Republic of the Philippines</div>
+        <div style="font-family:'Trajan Pro','Times New Roman',serif;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em;">Philippine Statistics Authority</div>
+        <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.14em;color:#555;">Davao del Sur Provincial Statistical Office</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;">${bagongImg}</div>
+    </div>
+
+    <div style="border-top:1px solid #777;margin-bottom:3mm;"></div>
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:6mm;">
+      <div style="border:2px solid #000;padding:5px 18px;font-weight:900;font-size:14px;letter-spacing:2px;text-transform:uppercase;">RETURN SLIP</div>
+    </div>
+
+    <div style="margin-bottom:3mm;display:flex;gap:6px;align-items:flex-end;">
+      <span style="font-weight:bold;">Date:</span>
+      <span style="border-bottom:1px solid #000;min-width:160px;display:inline-block;padding-bottom:1px;font-weight:bold;">${escapeHtml(form.date || '')}</span>
+    </div>
+
+    <div style="margin-bottom:4mm;line-height:2.1;font-size:10px;">
+      <span>This document states that </span>
+      <span style="border-bottom:1px solid #000;font-weight:bold;padding:0 4px;display:inline-block;min-width:130px;text-align:center;">${escapeHtml(form.returnedByName || '')}</span>
+      <span> have returned the borrowed out property/equipment listed below from </span>
+      <span style="border-bottom:1px solid #000;font-weight:bold;padding:0 4px;display:inline-block;min-width:100px;text-align:center;">${escapeHtml(form.borrowedTo || '')}</span>
+      <span> to </span>
+      <span style="border-bottom:1px solid #000;font-weight:bold;padding:0 4px;display:inline-block;min-width:110px;text-align:center;">${escapeHtml(form.borrowedFromName || '')}</span>
+      <span> that was used last </span>
+      <span style="border-bottom:1px solid #000;font-weight:bold;padding:0 4px;display:inline-block;min-width:110px;text-align:center;">${escapeHtml(form.usedLast || '')}</span>
+      <span> purpose/compliance of </span>
+      <span style="border-bottom:1px solid #000;font-weight:bold;padding:0 4px;display:inline-block;min-width:130px;text-align:center;">${escapeHtml(form.purposeCompliance || '')}</span>
+      <span>.</span>
+    </div>
+
+    <table style="margin-bottom:8mm;">
+      <thead>
+        <tr>
+          <th style="width:38%;">Description of<br/>Property/Equipment</th>
+          <th style="width:22%;">Property Number</th>
+          <th style="width:22%;">Date and Time<br/>Returned</th>
+          <th style="width:18%;">Remarks</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemRows}
+        ${emptyRows}
+      </tbody>
+    </table>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;column-gap:18mm;margin-bottom:7mm;">
+      <div>
+        <div style="font-weight:bold;margin-bottom:2mm;">Returned by:</div>
+        <div style="border-bottom:1px solid #000;font-weight:bold;font-size:12px;min-height:18px;padding-bottom:2px;">${escapeHtml(form.returnedByName || '')}</div>
+        <div style="text-align:center;font-size:9px;margin-top:3px;">(Name, Signature and Designation)</div>
+      </div>
+      <div>
+        <div style="font-weight:bold;margin-bottom:2mm;">Received by:</div>
+        <div style="border-bottom:1px solid #000;font-weight:bold;font-size:12px;text-align:center;min-height:18px;padding-bottom:2px;">${escapeHtml(form.borrowedFromName || '')}</div>
+        <div style="text-align:center;font-size:9px;margin-top:3px;">${escapeHtml(form.borrowedFromDesignation || 'Administrative Officer')}</div>
+        <div style="text-align:center;font-size:9px;margin-top:1px;">(Accountable Officer)</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;column-gap:18mm;margin-bottom:6mm;">
+      <div></div>
+      <div>
+        <div style="border-bottom:1px solid #000;font-weight:bold;font-size:12px;text-align:center;min-height:18px;padding-bottom:2px;">${escapeHtml(form.guardOnDuty || '')}</div>
+        <div style="text-align:center;font-size:9px;margin-top:3px;">(Guard on Duty)</div>
+      </div>
+    </div>
+
+    <div style="font-size:10px;display:grid;grid-template-columns:34px 1fr;gap:4px;">
+      <span style="font-weight:bold;">Note:</span>
+      <span>This slip returns the accountability of the above-mentioned property/equipment to the accountable officer.</span>
+    </div>
+  </div>
+
+  <div id="footer">${isoImg}</div>
+</body>
+</html>`
+
+    printWindow.document.open()
+    printWindow.document.write(html)
     printWindow.document.close()
-    printWindow.focus()
-    printWindow.print()
-    printWindow.close()
+
+    printWindow.onload = () => {
+      const imgs = Array.from(printWindow.document.images)
+      if (imgs.length === 0) {
+        printWindow.focus()
+        printWindow.print()
+        printWindow.onafterprint = () => printWindow.close()
+        return
+      }
+
+      let loaded = 0
+      const tryPrint = () => {
+        loaded++
+        if (loaded >= imgs.length) {
+          printWindow.focus()
+          printWindow.print()
+          printWindow.onafterprint = () => printWindow.close()
+        }
+      }
+
+      imgs.forEach(img => {
+        if (img.complete) tryPrint()
+        else {
+          img.onload = tryPrint
+          img.onerror = tryPrint
+        }
+      })
+    }
+  }
+
+  const handleEditRecord = (record: ReturnedRecord) => {
+    setEditingRecordId(record.id)
+    setOpenActionId(null)
+    setForm({
+      ...emptyForm,
+      linkedRecordId: record.borrowerId === '—' ? '' : record.borrowerId,
+      returnedByName: record.returnedByName,
+      returnedByDesignation: record.returnedByDesignation,
+      borrowedFromName: record.borrowedFromName,
+      purposeCompliance: record.purposeCompliance,
+      items: [{
+        description: record.itemName,
+        propertyNumber: record.propertyNumber,
+        dateTimeReturned: record.returnDate,
+        remarks: record.remarks,
+      }],
+    })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleDeleteRecord = (record: ReturnedRecord) => {
+    setOpenActionId(null)
+    setReturnedRecords(prev => prev.filter(item => item.id !== record.id))
+    if (editingRecordId === record.id) {
+      setEditingRecordId(null)
+      setForm(emptyForm)
+    }
   }
 
   // Returned records table filtering
@@ -594,8 +811,8 @@ export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps
           {/* Actions */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-[#1a2744]">
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              <button type="button" onClick={() => setForm(emptyForm)} className="w-full sm:w-auto px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-[#1a2744] border border-transparent hover:border-[#243357] transition">
-                Clear Form
+              <button type="button" onClick={() => { setForm(emptyForm); setEditingRecordId(null) }} className="w-full sm:w-auto px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-[#1a2744] border border-transparent hover:border-[#243357] transition">
+                {editingRecordId ? 'Cancel Edit' : 'Clear Form'}
               </button>
               <button type="button" onClick={handlePrint} disabled={!isFormValid} className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition">
                 Print Slip
@@ -605,7 +822,7 @@ export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps
 {submitting ? (
                 <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Submitting...</>
               ) : (
-                <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> Submit Return</>
+                <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> {editingRecordId ? 'Save Changes' : 'Submit Return'}</>
               )}
             </button>
           </div>
@@ -647,14 +864,14 @@ export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#1a2744]">
-                {['Return ID', 'Borrow Ref', 'Returned By', 'Item', 'Property No.', 'Returned To', 'Date Returned', 'Purpose', 'Remarks'].map(h => (
+                {['Return ID', 'Borrow Ref', 'Returned By', 'Item', 'Property No.', 'Returned To', 'Date Returned', 'Purpose', 'Remarks', ''].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-[10px] font-semibold text-slate-600 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={9} className="text-center py-14">
+                <tr><td colSpan={10} className="text-center py-14">
                   <div className="flex items-center justify-center gap-2 text-slate-600 text-sm">
                     <div className="w-4 h-4 border-2 border-slate-600 border-t-slate-400 rounded-full animate-spin" />
                     Loading records...
@@ -662,7 +879,7 @@ export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps
                 </td></tr>
               ) : paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-14">
+                  <td colSpan={10} className="text-center py-14">
                     <div className="flex flex-col items-center gap-2">
                       <svg className="w-8 h-8 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -690,6 +907,26 @@ export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps
                       ? <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 border border-slate-700 text-slate-300">{record.remarks}</span>
                       : <span className="text-slate-700">—</span>
                     }
+                  </td>
+                  <td className="px-4 py-3 text-right relative">
+                    <button
+                      type="button"
+                      onClick={() => setOpenActionId(openActionId === record.id ? null : record.id)}
+                      className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-[#1a2744] transition"
+                      aria-label="Record actions"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <circle cx="10" cy="4" r="1.5" />
+                        <circle cx="10" cy="10" r="1.5" />
+                        <circle cx="10" cy="16" r="1.5" />
+                      </svg>
+                    </button>
+                    {openActionId === record.id && (
+                      <div className="absolute right-4 top-10 z-30 w-32 overflow-hidden rounded-xl border border-[#1a2744] bg-[#0f1c35] shadow-2xl shadow-black/40">
+                        <button type="button" onClick={() => handleEditRecord(record)} className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-white/10 hover:text-white transition">Edit</button>
+                        <button type="button" onClick={() => handleDeleteRecord(record)} className="w-full px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10 transition">Delete</button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

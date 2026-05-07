@@ -106,6 +106,16 @@ export const toggleUserStatus = async (user_id: number, is_active: boolean) => {
   return response.data
 }
 
+export const updateProfile = async (data: {
+  full_name?: string
+  email?: string
+  department?: string
+  avatar_url?: string
+}) => {
+  const response = await api.patch('/api/auth/me', data)
+  return response.data
+}
+
 export const requestReactivation = async (email: string) => {
   const response = await api.post('/api/auth/request-reactivation', { email })
   return response.data

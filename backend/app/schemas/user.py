@@ -40,6 +40,8 @@ class UserOut(BaseModel):
     id: int
     email: str
     full_name: str
+    department: Optional[str] = None
+    avatar_url: Optional[str] = None
     role: str
     is_active: bool
     reactivation_requested: bool = False
@@ -70,3 +72,17 @@ class ToggleUserStatusBody(BaseModel):
 
 class ReactivationRequestBody(BaseModel):
     email: EmailStr
+
+
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    department: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+    @field_validator("email")
+    @classmethod
+    def email_must_be_psa(cls, value: Optional[EmailStr]):
+        if value is not None and not str(value).endswith(f"@{PSA_DOMAIN}"):
+            raise ValueError("Only @psa.gov.ph email addresses are allowed")
+        return value

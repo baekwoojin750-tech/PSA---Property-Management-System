@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getAllAssets, getAllBorrowRequests, createBorrowRequest } from '../../services/authService'
+import { getAllAssets, getAllBorrowRequests, createBorrowRequest, updateBorrowRequest, deleteBorrowRequest } from '../../services/authService'
 import { SearchableDropdown } from '../assets/assetComponents'
 import type { Asset } from '../assets/assetTypes'
 import { defaultEquipmentCategories, transformAsset } from '../assets/assetTypes'
@@ -120,6 +120,8 @@ export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
   const [page, setPage]           = useState(1)
   const [successBanner, setSuccessBanner] = useState(false)
   const [paperSize, setPaperSize] = useState<'A4' | 'Letter' | 'Legal'>('A4')
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null)
+  const [openActionId, setOpenActionId] = useState<string | null>(null)
   const PER_PAGE = 10
 
   // Paper size dimensions in mm
@@ -289,6 +291,51 @@ export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
     if (!isFormValid) return
     try {
       setLoading(true)
+      if (editingRecordId) {
+        const numericId = parseInt(editingRecordId.replace('BR-', ''), 10)
+        const item = form.items.find(it => it.description && it.propertyNumber) || form.items[0]
+        if (!isNaN(numericId) && item) {
+          const updated = await updateBorrowRequest(numericId, {
+            property_number: item.propertyNumber,
+            item_name: item.description,
+            borrower_name: form.borrowerName,
+            borrower_designation: form.borrowerDesignation || undefined,
+            department: form.fromPlace || undefined,
+            start_date: form.startDate,
+            end_date: form.endDate || undefined,
+            purpose: form.purposeCompliance || undefined,
+            destination: form.toDestination || undefined,
+          })
+          const nextRecord: BorrowRecord = {
+            id: `BR-${updated.id}`,
+            borrowerName: updated.borrower_name,
+            borrowerDesignation: updated.borrower_designation || '',
+            department: updated.department || 'General',
+            itemName: updated.item_name,
+            propertyNumber: updated.property_number,
+            startDate: updated.start_date,
+            endDate: updated.end_date || '',
+            status: updated.status as 'Active' | 'Returned' | 'Overdue',
+            destination: updated.destination || '',
+            purpose: updated.purpose || '',
+            borrowedFromName: form.borrowedFromName,
+            borrowedFromDesignation: form.borrowedFromDesignation,
+            items: [{
+              description: updated.item_name,
+              equipmentCategory: item.equipmentCategory || '',
+              propertyNumber: updated.property_number,
+              destination: updated.destination || '',
+              periodCovered: [updated.start_date, updated.end_date].filter(Boolean).join(' - '),
+            }],
+          }
+          setRecords(prev => prev.map(record => record.id === editingRecordId ? nextRecord : record))
+          setEditingRecordId(null)
+          setForm(emptyForm)
+          setSuccessBanner(true)
+          setTimeout(() => setSuccessBanner(false), 4000)
+        }
+        return
+      }
       // Create one borrow request per item
       const results = await Promise.all(
         form.items
@@ -347,6 +394,52 @@ export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
     }
   }
 
+  const handleEditRecord = (record: BorrowRecord) => {
+    setEditingRecordId(record.id)
+    setOpenActionId(null)
+    setForm({
+      date: new Date().toISOString().split('T')[0],
+      borrowerName: record.borrowerName,
+      borrowerDesignation: record.borrowerDesignation || '',
+      fromPlace: record.department || 'PSA Davao Del Sur',
+      toDestination: record.destination || '',
+      startDate: record.startDate,
+      endDate: record.endDate,
+      purposeCompliance: record.purpose || '',
+      requestedBy: record.borrowerName,
+      borrowedFromName: record.borrowedFromName || 'CRESENCE BERYL B. MEJORADA',
+      borrowedFromDesignation: record.borrowedFromDesignation || '',
+      approvedBy: emptyForm.approvedBy,
+      approvedByDesignation: emptyForm.approvedByDesignation,
+      items: record.items?.length
+        ? record.items.map(item => ({ ...item }))
+        : [{
+            description: record.itemName,
+            equipmentCategory: '',
+            propertyNumber: record.propertyNumber,
+            destination: record.destination || '',
+            periodCovered: [record.startDate, record.endDate].filter(Boolean).join(' - '),
+          }],
+    })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleDeleteRecord = async (record: BorrowRecord) => {
+    setOpenActionId(null)
+    const numericId = parseInt(record.id.replace('BR-', ''), 10)
+    try {
+      if (!isNaN(numericId)) await deleteBorrowRequest(numericId)
+      setRecords(prev => prev.filter(item => item.id !== record.id))
+      if (editingRecordId === record.id) {
+        setEditingRecordId(null)
+        setForm(emptyForm)
+      }
+    } catch (err) {
+      console.error('Failed to delete borrow request:', err)
+      alert('Failed to delete borrow request. Please try again.')
+    }
+  }
+
   // ─── Print handler ──────────────────────────────────────────────────────────
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=900,height=700')
@@ -398,6 +491,18 @@ export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
   <meta charset="utf-8" />
   <title>Borrower's Slip</title>
   <style>
+    @font-face {
+      font-family: 'Trajan Pro';
+      src: url('/fonts/trajan-pro/TrajanPro-Regular.ttf') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Trajan Pro';
+      src: url('/fonts/trajan-pro/TrajanPro-Bold.otf') format('opentype');
+      font-weight: 700 900;
+      font-style: normal;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     @page { size: A4 portrait; margin: 14mm 20mm; }
     html { height: 100%; }
@@ -417,7 +522,7 @@ export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
       <div>${psaImg}</div>
       <div style="text-align:center;line-height:1.4;">
         <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.18em;color:#555;">Republic of the Philippines</div>
-        <div style="font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em;">Philippine Statistics Authority</div>
+        <div style="font-family:'Trajan Pro','Times New Roman',serif;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em;">Philippine Statistics Authority</div>
         <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.14em;color:#555;">Davao del Sur Provincial Statistical Office</div>
       </div>
       <div style="display:flex;justify-content:flex-end;">${bagongImg}</div>
@@ -911,8 +1016,8 @@ export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
           {/* Actions */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-[#1a2744]">
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              <button type="button" onClick={() => setForm(emptyForm)} className="w-full sm:w-auto px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-[#1a2744] border border-transparent hover:border-[#243357] transition">
-                Clear Form
+              <button type="button" onClick={() => { setForm(emptyForm); setEditingRecordId(null) }} className="w-full sm:w-auto px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-[#1a2744] border border-transparent hover:border-[#243357] transition">
+                {editingRecordId ? 'Cancel Edit' : 'Clear Form'}
               </button>
               <button type="button" onClick={handlePrint} disabled={!isFormValid} className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17H17.01M17 8H7a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2v-8a2 2 0 00-2-2zM17 8V6a2 2 0 00-2-2H9a2 2 0 00-2 2v2" /></svg>
@@ -923,7 +1028,7 @@ export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              Submit Request
+              {editingRecordId ? 'Save Changes' : 'Submit Request'}
             </button>
           </div>
         </div>
@@ -963,14 +1068,14 @@ export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#1a2744]">
-                {['Request ID', 'Borrower', 'Department', 'Item', 'Property No.', 'Start Date', 'End Date', 'Status'].map(h => (
+                {['Request ID', 'Borrower', 'Department', 'Item', 'Property No.', 'Start Date', 'End Date', 'Status', ''].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-[10px] font-semibold text-slate-600 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {paginated.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-14 text-slate-600 text-sm">No borrow records found</td></tr>
+                <tr><td colSpan={9} className="text-center py-14 text-slate-600 text-sm">No borrow records found</td></tr>
               ) : paginated.map((record, i) => (
                 <tr key={record.id} className={`border-b border-[#131f33] hover:bg-[#0f1a2e] transition-colors ${i % 2 === 0 ? '' : 'bg-[#0a1120]/40'}`}>
                   <td className="px-4 py-3 text-xs font-mono text-blue-400 whitespace-nowrap">{record.id}</td>
@@ -982,6 +1087,26 @@ export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
                   <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{record.endDate}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${statusColor[record.status] || ''}`}>{record.status}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right relative">
+                    <button
+                      type="button"
+                      onClick={() => setOpenActionId(openActionId === record.id ? null : record.id)}
+                      className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-[#1a2744] transition"
+                      aria-label="Record actions"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <circle cx="10" cy="4" r="1.5" />
+                        <circle cx="10" cy="10" r="1.5" />
+                        <circle cx="10" cy="16" r="1.5" />
+                      </svg>
+                    </button>
+                    {openActionId === record.id && (
+                      <div className="absolute right-4 top-10 z-30 w-32 overflow-hidden rounded-xl border border-[#1a2744] bg-[#0f1c35] shadow-2xl shadow-black/40">
+                        <button type="button" onClick={() => handleEditRecord(record)} className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-white/10 hover:text-white transition">Edit</button>
+                        <button type="button" onClick={() => handleDeleteRecord(record)} className="w-full px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10 transition">Delete</button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

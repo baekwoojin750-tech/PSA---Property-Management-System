@@ -14,5 +14,6 @@ class AuthorizationRequest(Base):
     status = Column(String, default="pending")      # "pending" | "approved" | "rejected"
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     resolved_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
 
     admin = relationship("User")

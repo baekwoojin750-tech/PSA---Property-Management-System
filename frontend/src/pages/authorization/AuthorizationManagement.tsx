@@ -43,20 +43,25 @@ export default function AuthorizationManagement() {
   const [activeTab, setActiveTab] = useState<'pending' | 'all'>('pending')
   const [expandedRemarks, setExpandedRemarks] = useState<number | null>(null)
 
-  const fetchAdmins = async () => {
+  const fetchAdmins = async (silent = false) => {
     if (!token) return
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       const data = await getAllAdmins(token)
       setAdmins(data)
+      setError('')
     } catch {
-      setError('Failed to load admins.')
+      if (!silent) setError('Failed to load admins.')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
-  useEffect(() => { fetchAdmins() }, [token])
+  useEffect(() => {
+    fetchAdmins(false)
+    const intervalId = window.setInterval(() => fetchAdmins(true), 3000)
+    return () => window.clearInterval(intervalId)
+  }, [token])
 
   const showToast = (msg: string, type: 'success' | 'error') => {
     setToast({ msg, type })

@@ -23,6 +23,7 @@ from app.schemas.user import (
     ReactivationRequestBody,
     ResetPassword,
     ToggleUserStatusBody,
+    UserUpdate,
     UserLogin,
     UserOut,
     UserRegister,
@@ -101,6 +102,8 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
         "role": user.role,
         "email": user.email,
         "full_name": user.full_name,
+        "department": user.department,
+        "avatar_url": user.avatar_url,
         "id": user.id,
         "is_active": user.is_active,
         "reactivation_requested": user.reactivation_requested,
@@ -173,6 +176,35 @@ def get_all_users(
     current_user: User = Depends(get_current_super_admin),
 ):
     return db.query(User).order_by(User.created_at.desc(), User.id.desc()).all()
+
+
+@router.patch("/me", response_model=UserOut)
+def update_me(
+    data: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if data.email is not None and data.email != current_user.email:
+        existing = db.query(User).filter(User.email == data.email, User.id != current_user.id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        current_user.email = str(data.email)
+
+    if data.full_name is not None:
+        full_name = data.full_name.strip()
+        if not full_name:
+            raise HTTPException(status_code=400, detail="Full name is required")
+        current_user.full_name = full_name
+
+    if data.department is not None:
+        current_user.department = data.department.strip() or None
+
+    if data.avatar_url is not None:
+        current_user.avatar_url = data.avatar_url
+
+    db.commit()
+    db.refresh(current_user)
+    return current_user
 
 
 @router.post("/toggle-user-status", response_model=UserOut)
@@ -312,7 +344,7 @@ def get_all_admins(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_super_admin),
 ):
-    admins = db.query(User).filter(User.role == "admin").all()
+    admins = db.query(User).filter(User.role == "admin").order_by(User.created_at.desc(), User.id.desc()).all()
     now = datetime.utcnow()
 
     result = []
@@ -326,12 +358,30 @@ def get_all_admins(
             AuthorizationRequest.admin_id == user.id,
             AuthorizationRequest.status == "pending",
         ).all()
+        latest_expired_grant = db.query(AuthorizationRequest).filter(
+            AuthorizationRequest.admin_id == user.id,
+            AuthorizationRequest.status == "approved",
+            AuthorizationRequest.expires_at <= now,
+        ).order_by(AuthorizationRequest.expires_at.desc()).first()
+
+        authorization_expiry = max((grant.expires_at for grant in active_grants), default=None)
+        if active_grants:
+            auth_status = "authorized"
+        elif pending_reqs:
+            auth_status = "pending"
+        elif latest_expired_grant:
+            auth_status = "expired"
+            authorization_expiry = latest_expired_grant.expires_at
+        else:
+            auth_status = "none"
 
         result.append(
             {
                 "id": user.id,
                 "full_name": user.full_name,
                 "email": user.email,
+                "authorization_expiry": authorization_expiry.isoformat() if authorization_expiry else None,
+                "auth_status": auth_status,
                 "granted_pages": [
                     {"page": grant.page, "expires_at": grant.expires_at.isoformat()}
                     for grant in active_grants
@@ -383,14 +433,22 @@ def grant_authorization(
     req.status = "approved"
     req.resolved_at = now
     req.expires_at = base + timedelta(days=body.days)
+    active_expiry = db.query(AuthorizationRequest.expires_at).filter(
+        AuthorizationRequest.admin_id == admin.id,
+        AuthorizationRequest.status == "approved",
+        AuthorizationRequest.expires_at > now,
+    ).order_by(AuthorizationRequest.expires_at.desc()).first()
+    admin.authorization_expiry = active_expiry[0] if active_expiry else req.expires_at
 
     db.commit()
     db.refresh(req)
+    db.refresh(admin)
     return {
         "message": f"Authorization granted for {body.days} day(s) on {req.page}",
         "admin_id": admin.id,
         "page": req.page,
         "expires_at": req.expires_at.isoformat(),
+        "authorization_expiry": admin.authorization_expiry.isoformat() if admin.authorization_expiry else None,
     }
 
 
@@ -421,6 +479,12 @@ def revoke_authorization(
 
     for grant in revoked:
         grant.expires_at = now
+    remaining_expiry = db.query(AuthorizationRequest.expires_at).filter(
+        AuthorizationRequest.admin_id == admin.id,
+        AuthorizationRequest.status == "approved",
+        AuthorizationRequest.expires_at > now,
+    ).order_by(AuthorizationRequest.expires_at.desc()).first()
+    admin.authorization_expiry = remaining_expiry[0] if remaining_expiry else None
     db.commit()
 
     pages_revoked = [grant.page for grant in revoked]

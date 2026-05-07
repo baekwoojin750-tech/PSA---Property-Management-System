@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import Navbar from '../../components/shared/Navbar'
 import { useAuthStore } from '../../stores/authStore'
-import { createActivityLog, getAllBorrowRequests, getMyActivityLogs } from '../../services/authService'
+import { createActivityLog, getAllBorrowRequests, getMyActivityLogs, updateProfile } from '../../services/authService'
 
 type ActiveTab = 'activity' | 'requests'
 type RequestSubTab = 'borrow' | 'gatepass' | 'returnslip'
@@ -90,15 +90,35 @@ export default function Profile() {
   }
 
   const handleSave = async () => {
-    setSaved({ ...form })
     if (user) {
-      setUser({
-        ...user,
-        full_name: form.fullName,
-        email: form.email,
-        department: form.department,
-        avatar_url: avatarUrl || user.avatar_url || '',
-      })
+      try {
+        const updated = await updateProfile({
+          full_name: form.fullName,
+          email: form.email,
+          department: form.department,
+          avatar_url: avatarUrl || user.avatar_url || '',
+        })
+        const next = {
+          ...user,
+          full_name: updated.full_name ?? form.fullName,
+          email: updated.email ?? form.email,
+          department: updated.department ?? form.department,
+          avatar_url: updated.avatar_url ?? avatarUrl ?? user.avatar_url ?? '',
+        }
+        setUser(next)
+        setSaved({ fullName: next.full_name, email: next.email, department: next.department ?? '' })
+      } catch (err) {
+        console.error('Failed to update profile:', err)
+        // Still update local state even if API fails (graceful degradation)
+        setUser({
+          ...user,
+          full_name: form.fullName,
+          email: form.email,
+          department: form.department,
+          avatar_url: avatarUrl || user.avatar_url || '',
+        })
+        setSaved({ ...form })
+      }
       try {
         const log = await createActivityLog({
           action: 'Updated profile',

@@ -122,7 +122,6 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
   }, [])
 
   const handlePrint = () => {
-    if (!printRef.current) return;
     if (!psaLogo || !bagongLogo || !isoFooter) {
       // Images still loading — retry after a short delay
       setTimeout(() => handlePrint(), 400)
@@ -131,28 +130,57 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
     const printWindow = window.open('', '_blank', 'width=900,height=700');
     if (!printWindow) return;
 
-    // Dimensions
-    const HEADER_H = 34   // mm — PSA logo header band
-    const FOOTER_H = 18   // mm — ISO footer band
-    const SIDE_MM  = 25.4 // mm — 2.54 cm / 1 inch
-
     const psaSrc    = psaLogo    || ''
     const bagongSrc = bagongLogo || ''
     const isoSrc    = isoFooter  || ''
 
     const psaImg = psaSrc
-      ? `<img src="${psaSrc}" style="width:64px;height:64px;object-fit:contain;display:block;" />`
-      : `<div style="width:64px;height:64px;"></div>`
+      ? `<img src="${psaSrc}" style="width:72px;height:72px;object-fit:contain;display:block;" />`
+      : ''
 
     const bagongImg = bagongSrc
-      ? `<img src="${bagongSrc}" style="width:64px;height:64px;object-fit:contain;display:block;" />`
-      : `<div style="width:64px;height:64px;"></div>`
+      ? `<img src="${bagongSrc}" style="width:72px;height:72px;object-fit:contain;display:block;" />`
+      : ''
 
     const isoImg = isoSrc
-      ? `<img src="${isoSrc}" style="width:100%;max-height:40px;object-fit:contain;object-position:left;" />`
-      : `<div style="font-size:8px;color:#888;">3rd Floor JM Agro Building, Gov. Sales St., Davao City, Philippines 8000</div>`
+      ? `<img src="${isoSrc}" style="max-height:48px;object-fit:contain;object-position:left;" />`
+      : '<span style="font-size:8px;color:#888;">3rd Floor JM Agro Building, Gov. Sales St., Davao City, Philippines 8000</span>'
 
-    const bodyContent = printRef.current.innerHTML
+    const escapeHtml = (value: string) =>
+      value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+
+    const filledItems = form.items.filter(item => item.description || item.propertyNumber || item.destination || item.periodCovered)
+    const itemRows = filledItems.map(item =>
+      '<tr>' +
+        '<td style="border:1px solid #000;padding:6px 8px;font-size:11px;font-weight:700;vertical-align:middle;">' + escapeHtml(item.description || '') + '</td>' +
+        '<td style="border:1px solid #000;padding:6px 8px;font-size:11px;text-align:center;vertical-align:middle;">' + escapeHtml(item.propertyNumber || '') + '</td>' +
+        '<td style="border:1px solid #000;padding:6px 8px;font-size:11px;text-align:center;vertical-align:middle;">' + escapeHtml(item.destination || form.destinationCity || '') + '</td>' +
+        '<td style="border:1px solid #000;padding:6px 8px;font-size:11px;text-align:center;vertical-align:middle;">' + escapeHtml(item.periodCovered || getPeriodCovered() || '') + '</td>' +
+      '</tr>'
+    ).join('')
+
+    const emptyRows = Array.from({ length: Math.max(1, 4 - filledItems.length) }).map(() =>
+      '<tr>' +
+        '<td style="border:1px solid #000;height:34px;"></td>' +
+        '<td style="border:1px solid #000;"></td>' +
+        '<td style="border:1px solid #000;"></td>' +
+        '<td style="border:1px solid #000;"></td>' +
+      '</tr>'
+    ).join('')
+
+    const requestedBy = requestedByDisplay || form.requestedBy
+    const dateText = form.date || ''
+    const recipientText = form.recipientName || '_______________'
+    const originText = form.origin || 'PSA Davao Del Sur'
+    const destinationText = form.destinationCity || '_______________'
+    const startText = form.startDate || '_______________'
+    const endText = form.endDate || '_______________'
+    const purposeText = form.purpose || '_______________'
 
     const html = `<!DOCTYPE html>
 <html>
@@ -161,104 +189,99 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
   <title>Gate Pass</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    /*
-     * @page margins carve out bands at top/bottom for the fixed header/footer.
-     * Left/right match 2.54 cm so content never touches the paper edge.
-     */
-    @page {
-      size: 210mm 297mm portrait;
-      margin-top:    ${HEADER_H + 6}mm;
-      margin-bottom: ${FOOTER_H + 6}mm;
-      margin-left:   ${SIDE_MM}mm;
-      margin-right:  ${SIDE_MM}mm;
-    }
-
-    html, body {
-      font-family: Arial, sans-serif;
-      font-size: 11px;
-      color: #000;
-      background: #fff;
-    }
-
-    /*
-     * HEADER — position:fixed makes it repeat on every printed page.
-     * Negative left/right extend past the @page side margins so the
-     * header spans the full paper width; padding re-aligns content.
-     */
-    #ph {
-      position: fixed;
-      top: -${HEADER_H + 6}mm;
-      left:  -${SIDE_MM}mm;
-      right: -${SIDE_MM}mm;
-      height: ${HEADER_H}mm;
-      padding: 3mm ${SIDE_MM}mm 2mm ${SIDE_MM}mm;
-      background: #fff;
-      display: grid;
-      grid-template-columns: 70px 1fr 70px;
-      align-items: center;
-      border-bottom: 1.5px solid #bbb;
-    }
-    #ph .hc { text-align: center; line-height: 1.35; }
-    #ph .hs { font-size: 7px; text-transform: uppercase; letter-spacing: 0.16em; color: #555; }
-    #ph .ht { font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; color: #000; }
-    #ph .hr { display: flex; justify-content: flex-end; }
-
-    /* FOOTER — same pattern */
-    #pf {
-      position: fixed;
-      bottom: -${FOOTER_H + 6}mm;
-      left:  -${SIDE_MM}mm;
-      right: -${SIDE_MM}mm;
-      height: ${FOOTER_H}mm;
-      padding: 2mm ${SIDE_MM}mm;
-      background: #fff;
-      display: flex;
-      align-items: center;
-      border-top: 1.5px solid #bbb;
-    }
-
-    /* Table styles */
+    @page { size: A4 portrait; margin: 14mm 20mm; }
+    html { height: 100%; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #000; background: #fff; min-height: 100%; display: flex; flex-direction: column; }
+    #content { flex: 1; }
+    #footer { margin-top: auto; }
     thead { display: table-header-group; }
     table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid #000; padding: 5px 7px; vertical-align: middle; }
-    th { font-size: 11px; font-weight: bold; text-align: center; line-height: 1.2; background: #fff; }
-
-    input, textarea {
-      border: none;
-      border-bottom: 1px solid #000;
-      background: transparent;
-      font-family: Arial, sans-serif;
-      font-size: 11px;
-      outline: none;
-    }
-
-    .no-break { page-break-inside: avoid; break-inside: avoid; }
-
-    @media print {
-      html, body { height: auto !important; overflow: visible !important; }
-    }
+    th, td { border: 1px solid #000; padding: 6px 8px; vertical-align: middle; }
+    th { font-size: 11px; font-weight: bold; text-align: center; line-height: 1.2; }
+    @media print { html, body { height: 100% !important; } }
   </style>
 </head>
 <body>
-
-  <!-- Fixed header — appears on every page -->
-  <div id="ph">
-    <div>${psaImg}</div>
-    <div class="hc">
-      <div class="hs">Republic of the Philippines</div>
-      <div class="ht">Philippine Statistics Authority</div>
-      <div class="hs">Davao del Sur Provincial Statistical Office</div>
+  <div id="content">
+    <!-- HEADER: copied from borrower's slip -->
+    <div style="display:grid;grid-template-columns:80px 1fr 80px;align-items:center;margin-bottom:6mm;">
+      <div>${psaImg}</div>
+      <div style="text-align:center;line-height:1.4;">
+        <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.18em;color:#555;">Republic of the Philippines</div>
+        <div style="font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em;">Philippine Statistics Authority</div>
+        <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.14em;color:#555;">Davao del Sur Provincial Statistical Office</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;">${bagongImg}</div>
     </div>
-    <div class="hr">${bagongImg}</div>
+
+    <!-- GATE PASS label -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:5mm;">
+      <div style="border:2px solid #000;padding:5px 18px;font-weight:900;font-size:14px;letter-spacing:2px;text-transform:uppercase;">GATE PASS</div>
+    </div>
+
+    <!-- Date -->
+    <div style="margin-bottom:4mm;display:flex;gap:6px;align-items:flex-end;">
+      <span style="font-weight:bold;">Date:</span>
+      <span style="border-bottom:1px solid #000;min-width:160px;display:inline-block;padding-bottom:1px;font-weight:bold;">${escapeHtml(dateText)}</span>
+    </div>
+
+    <div style="margin-bottom:4mm;font-weight:bold;">TO THE GUARD ON DUTY:</div>
+
+    <!-- Body paragraph -->
+    <div style="margin-bottom:5mm;line-height:2.1;">
+      <span>Please allow </span>
+      <span style="border-bottom:1px solid #000;font-weight:bold;text-decoration:underline;padding:0 4px;display:inline-block;min-width:150px;text-align:center;">${escapeHtml(recipientText)}</span>
+      <span> / to bring out property/equipment listed below from </span>
+      <span style="border-bottom:1px solid #000;font-weight:bold;padding:0 4px;display:inline-block;min-width:100px;text-align:center;">${escapeHtml(originText)}</span>
+      <span> to </span>
+      <span style="border-bottom:1px solid #000;font-weight:bold;padding:0 4px;display:inline-block;min-width:120px;text-align:center;">${escapeHtml(destinationText)}</span>
+      <span> from </span>
+      <span style="border-bottom:1px solid #000;font-weight:bold;padding:0 4px;display:inline-block;min-width:110px;text-align:center;">${escapeHtml(startText)}</span>
+      <span> to </span>
+      <span style="border-bottom:1px solid #000;font-weight:bold;padding:0 4px;display:inline-block;min-width:110px;text-align:center;">${escapeHtml(endText)}</span>
+      <span> for the purpose/compliance of </span>
+      <span style="border-bottom:1px solid #000;font-weight:bold;text-decoration:underline;padding:0 4px;display:inline-block;min-width:160px;text-align:center;">${escapeHtml(purposeText)}</span>
+      <span>.</span>
+    </div>
+
+    <!-- Items table -->
+    <table style="margin-bottom:7mm;">
+      <thead>
+        <tr>
+          <th style="width:38%;">Description of<br/>Property/Equipment</th>
+          <th style="width:22%;">Property Number</th>
+          <th style="width:22%;">Destination</th>
+          <th style="width:18%;">Period<br/>Covered</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemRows}
+        ${emptyRows}
+      </tbody>
+    </table>
+
+    <!-- Signatures -->
+    <div style="display:grid;grid-template-columns:110px 1fr;column-gap:10px;row-gap:14px;max-width:420px;margin-bottom:8mm;">
+      <div style="font-weight:bold;padding-top:2px;">Requested by:</div>
+      <div>
+        <div style="border-bottom:1px solid #000;font-weight:bold;font-size:12px;text-align:center;padding-bottom:2px;">${escapeHtml(requestedBy || '')}</div>
+        <div style="text-align:center;font-size:9px;margin-top:3px;">(Name and Designation)</div>
+      </div>
+      <div style="font-weight:bold;padding-top:2px;">Approved by:</div>
+      <div>
+        <div style="border-bottom:1px solid #000;font-weight:bold;font-size:12px;text-align:center;padding-bottom:2px;">${escapeHtml(form.approvedBy || '')}</div>
+        <div style="text-align:center;font-size:9px;margin-top:3px;">${escapeHtml(form.approvedByDesignation || 'Supervisor/Division Chief/RD/PSO')}</div>
+      </div>
+      <div></div>
+      <div style="max-width:260px;">
+        <div style="border-bottom:1px solid #000;font-weight:bold;font-size:12px;text-align:center;padding-bottom:2px;">${escapeHtml(form.guardOnDuty || '')}</div>
+        <div style="text-align:center;font-size:9px;margin-top:3px;">(Guard on Duty)</div>
+      </div>
+    </div>
   </div>
 
-  <!-- Fixed footer — appears on every page -->
-  <div id="pf">${isoImg}</div>
-
-  <!-- Page content — flows naturally within @page margins -->
-  ${bodyContent}
-
+  <!-- FOOTER: copied from borrower's slip -->
+  <div id="footer">${isoImg}</div>
 </body>
 </html>`
 

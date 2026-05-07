@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>404 — Page Not Found | PSA Property Management</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue-deep:   #042C53;
+      --blue-mid:    #0C447C;
+      --blue-main:   #185FA5;
+      --blue-light:  #378ADD;
+      --blue-soft:   #85B7EB;
+      --blue-pale:   #B5D4F4;
+      --blue-ghost:  #E6F1FB;
+      --red:         #E24B4A;
+      --red-pale:    #FCEBEB;
+      --gray-dark:   #2C2C2A;
+      --gray-mid:    #888780;
+      --gray-light:  #F1EFE8;
+      --white:       #ffffff;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--blue-ghost);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(24,95,165,0.06) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(24,95,165,0.06) 40px);
+      pointer-events: none;
+    }
+
+    .card {
+      background: var(--white);
+      border-radius: 20px;
+      border: 1px solid var(--blue-pale);
+      padding: 3rem 3.5rem;
+      max-width: 540px;
+      width: 100%;
+      text-align: center;
+      position: relative;
+      animation: rise 0.6s cubic-bezier(0.22,1,0.36,1) both;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(32px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 2.5rem;
+      animation: rise 0.6s 0.1s cubic-bezier(0.22,1,0.36,1) both;
+    }
+
+    .logo-wordmark { font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 500; color: var(--blue-mid); letter-spacing: 4px; }
+    .logo-sub { font-size: 9px; color: var(--gray-mid); letter-spacing: 2px; text-transform: uppercase; }
+    .brand-logo {
+      width: 34px;
+      height: 34px;
+      object-fit: contain;
+      display: block;
+    }
+
+    .building-wrap {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      margin: 0 auto 1.5rem;
+      animation: rise 0.6s 0.15s cubic-bezier(0.22,1,0.36,1) both;
+    }
+
+    .err-code {
+      font-family: 'DM Serif Display', serif;
+      font-size: 88px;
+      color: var(--blue-main);
+      line-height: 1;
+      letter-spacing: -3px;
+      animation: rise 0.6s 0.2s cubic-bezier(0.22,1,0.36,1) both;
+    }
+
+    .err-title {
+      font-size: 20px;
+      font-weight: 500;
+      color: var(--gray-dark);
+      margin: 0.5rem 0 0.75rem;
+      animation: rise 0.6s 0.25s cubic-bezier(0.22,1,0.36,1) both;
+    }
+
+    .divider {
+      width: 40px;
+      height: 3px;
+      background: var(--blue-light);
+      border-radius: 2px;
+      margin: 0 auto 1.25rem;
+      animation: rise 0.6s 0.3s cubic-bezier(0.22,1,0.36,1) both;
+    }
+
+    .err-desc {
+      font-size: 14px;
+      color: var(--gray-mid);
+      line-height: 1.7;
+      margin-bottom: 2rem;
+      animation: rise 0.6s 0.35s cubic-bezier(0.22,1,0.36,1) both;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      animation: rise 0.6s 0.4s cubic-bezier(0.22,1,0.36,1) both;
+    }
+
+    .btn-primary {
+      background: var(--blue-main);
+      color: var(--white);
+      border: none;
+      border-radius: 10px;
+      padding: 11px 26px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .btn-primary:hover { background: var(--blue-mid); transform: translateY(-1px); }
+    .btn-primary:active { transform: scale(0.97); }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--blue-main);
+      border: 1px solid var(--blue-pale);
+      border-radius: 10px;
+      padding: 11px 26px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .btn-outline:hover { background: var(--blue-ghost); transform: translateY(-1px); }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 2rem;
+      font-size: 11px;
+      color: var(--red);
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      animation: rise 0.6s 0.45s cubic-bezier(0.22,1,0.36,1) both;
+    }
+
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--red);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.3; }
+    }
+
+    .corner-code {
+      position: absolute;
+      top: 1.25rem;
+      right: 1.5rem;
+      font-size: 11px;
+      color: var(--blue-pale);
+      font-weight: 300;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <span class="corner-code">ERR_404</span>
+
+  <div class="logo-row">
+    <img src="/psa_logo.svg" alt="PSA logo" class="brand-logo" />
+    <div>
+      <div class="logo-wordmark">PSA</div>
+      <div class="logo-sub">Property Management System</div>
+    </div>
+  </div>
+
+  <div class="building-wrap">
+    <svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
+      <polygon points="48,4 92,26 92,88 4,88 4,26" fill="#E6F1FB" stroke="#B5D4F4" stroke-width="1"/>
+      <polygon points="48,12 86,30 86,88 10,88 10,30" fill="#185FA5"/>
+      <polygon points="48,18 82,32 82,88 14,88 14,32" fill="#378ADD"/>
+      <rect x="18" y="40" width="60" height="48" fill="#0C447C"/>
+      <rect x="18" y="40" width="28" height="48" fill="#185FA5"/>
+      <rect x="22" y="45" width="12" height="10" rx="1" fill="#B5D4F4"/>
+      <rect x="40" y="45" width="12" height="10" rx="1" fill="#B5D4F4"/>
+      <rect x="58" y="45" width="12" height="10" rx="1" fill="#B5D4F4"/>
+      <rect x="22" y="61" width="12" height="10" rx="1" fill="#B5D4F4"/>
+      <rect x="40" y="61" width="12" height="10" rx="1" fill="#B5D4F4"/>
+      <rect x="58" y="61" width="12" height="10" rx="1" fill="#B5D4F4"/>
+      <rect x="38" y="74" width="20" height="14" rx="2" fill="#85B7EB"/>
+      <line x1="8" y1="88" x2="88" y2="8" stroke="#E24B4A" stroke-width="4" stroke-linecap="round"/>
+      <line x1="88" y1="88" x2="8" y2="8" stroke="#E24B4A" stroke-width="4" stroke-linecap="round"/>
+    </svg>
+  </div>
+
+  <div class="err-code">404</div>
+  <div class="err-title">Page not found</div>
+  <div class="divider"></div>
+  <p class="err-desc">The property page you're looking for doesn't exist or may have been removed. Please check the URL or return to the dashboard.</p>
+
+  <div class="actions">
+    <button class="btn-primary" onclick="window.location.href='/'">Go to dashboard</button>
+    <button class="btn-outline" onclick="history.back()">Go back</button>
+  </div>
+
+  <div class="status-bar">
+    <span class="status-dot"></span>
+    Page unavailable
+  </div>
+</div>
+
+</body>
+</html>

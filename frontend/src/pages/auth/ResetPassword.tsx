@@ -158,11 +158,10 @@ export default function ResetPassword() {
         .logo-area { display: flex; align-items: center; gap: 14px; position: relative; z-index: 1; }
         .logo-icon {
           width: 48px; height: 48px;
-          background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
-          border: 1px solid rgba(255,255,255,0.2); border-radius: 14px;
           display: flex; align-items: center; justify-content: center;
-          font-size: 22px; backdrop-filter: blur(8px); flex-shrink: 0;
+          flex-shrink: 0;
         }
+        .logo-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
         .logo-text { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: #fff; line-height: 1.3; }
         .logo-sub { font-size: 0.65rem; color: rgba(147,197,253,0.8); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 1px; }
         .panel-headline { position: relative; z-index: 1; }
@@ -310,7 +309,9 @@ export default function ResetPassword() {
           {/* LEFT PANEL */}
           <div className="panel-left">
             <div className="logo-area">
-              <div className="logo-icon">🏛️</div>
+              <div className="logo-icon">
+                <img src="/psa_logo.svg" alt="PSA logo" />
+              </div>
               <div>
                 <div className="logo-text">PSA</div>
                 <div className="logo-sub">Philippine Statistics Authority</div>

@@ -116,13 +116,14 @@ export default function ForgotPassword() {
         }
         .logo-icon {
           width: 48px; height: 48px;
-          background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
-          border: 1px solid rgba(255,255,255,0.2);
-          border-radius: 14px;
           display: flex; align-items: center; justify-content: center;
-          font-size: 22px;
-          backdrop-filter: blur(8px);
           flex-shrink: 0;
+        }
+        .logo-icon img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          display: block;
         }
         .logo-text {
           font-family: 'Playfair Display', serif;
@@ -335,7 +336,9 @@ export default function ForgotPassword() {
           {/* LEFT PANEL */}
           <div className="panel-left">
             <div className="logo-area">
-              <div className="logo-icon">🏛️</div>
+              <div className="logo-icon">
+                <img src="/psa_logo.svg" alt="PSA logo" />
+              </div>
               <div>
                 <div className="logo-text">PSA</div>
                 <div className="logo-sub">Philippine Statistics Authority</div>

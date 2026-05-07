@@ -63,8 +63,8 @@ export default function Navbar() {
           className="flex items-center gap-2 cursor-pointer shrink-0"
           onClick={() => navigate(role === 'user' ? '/request' : '/dashboard')}
         >
-          <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold shadow">
-            P
+          <div className="w-8 h-8 flex items-center justify-center shrink-0 overflow-hidden">
+            <img src="/psa_logo.svg" alt="PSA logo" className="w-full h-full object-contain" />
           </div>
           <span className="text-white text-sm font-semibold tracking-wide hidden sm:block">
             PSA <span className="text-blue-400">PMS</span>

@@ -618,8 +618,8 @@ export default function UserLayout() {
         <div className={`flex items-center h-14 border-b border-[#1a2744] px-3 ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
           {sidebarOpen && (
             <div className="flex items-center gap-2 overflow-hidden">
-              <div className="w-6 h-6 rounded-md bg-blue-600 flex items-center justify-center shrink-0">
-                <span className="text-white text-[10px] font-bold">P</span>
+              <div className="w-7 h-7 flex items-center justify-center shrink-0 overflow-hidden">
+                <img src="/psa_logo.svg" alt="PSA logo" className="w-full h-full object-contain" />
               </div>
               <span className="text-white font-bold text-sm tracking-wide whitespace-nowrap">
                 PSA <span className="text-blue-400">PMS</span>

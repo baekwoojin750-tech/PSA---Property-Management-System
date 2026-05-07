@@ -1,0 +1,44 @@
+<svg width="680" height="400" viewBox="0 0 680 400" xmlns="http://www.w3.org/2000/svg">
+  <title>PSA Property Management System Logo</title>
+  <desc>A modern logo for PSA Property Management System featuring a stylized building icon and clean typography.</desc>
+
+  <style>
+    .logo-text { font-family: Arial, Helvetica, sans-serif; fill: #1a1a1a; }
+    .tag-text  { font-family: Arial, Helvetica, sans-serif; fill: #666666; }
+    .roof-main   { fill: #185FA5; }
+    .roof-accent { fill: #378ADD; }
+    .wall-main   { fill: #0C447C; }
+    .wall-light  { fill: #185FA5; }
+    .door        { fill: #85B7EB; }
+    .window      { fill: #B5D4F4; }
+  </style>
+
+  <g transform="translate(170, 60)">
+    <polygon class="roof-main" points="100,0 200,60 0,60"/>
+    <polygon class="roof-accent" points="100,8 192,60 8,60"/>
+    <rect class="wall-main" x="10" y="60" width="180" height="120"/>
+    <rect class="wall-light" x="10" y="60" width="80" height="120"/>
+    <rect class="window" x="24" y="76" width="30" height="26" rx="2"/>
+    <rect class="window" x="66" y="76" width="30" height="26" rx="2"/>
+    <rect class="window" x="110" y="76" width="30" height="26" rx="2"/>
+    <rect class="window" x="152" y="76" width="30" height="26" rx="2"/>
+    <rect class="window" x="24" y="116" width="30" height="26" rx="2"/>
+    <rect class="window" x="66" y="116" width="30" height="26" rx="2"/>
+    <rect class="window" x="110" y="116" width="30" height="26" rx="2"/>
+    <rect class="window" x="152" y="116" width="30" height="26" rx="2"/>
+    <rect class="door" x="80" y="132" width="40" height="48" rx="3"/>
+    <circle class="roof-accent" cx="117" cy="156" r="3"/>
+    <line x1="0" y1="182" x2="200" y2="182" stroke="#378ADD" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <text x="340" y="172" text-anchor="middle" class="logo-text"
+        font-size="64" font-weight="500" letter-spacing="6">PSA</text>
+
+  <text x="340" y="212" text-anchor="middle" class="tag-text"
+        font-size="18" font-weight="400" letter-spacing="3">PROPERTY MANAGEMENT SYSTEM</text>
+
+  <line x1="220" y1="228" x2="460" y2="228" stroke="#378ADD" stroke-width="0.5"/>
+
+  <text x="340" y="252" text-anchor="middle" class="tag-text"
+        font-size="13" font-weight="400" letter-spacing="1">Smart solutions for smarter properties</text>
+</svg>

@@ -3,6 +3,7 @@ import { getAllAssets } from '../../services/authService'
 import type { Asset } from '../assets/assetTypes'
 import { defaultEquipmentCategories, transformAsset } from '../assets/assetTypes'
 import { SearchableDropdown } from '../assets/assetComponents'
+import { RecordActionMenu } from './RecordActionMenu'
 
 /* ─────────────────────────────────────────────
    Convert public-folder image → base64
@@ -881,25 +882,15 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
                   <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{record.requestedBy}</td>
                   <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{record.approvedBy || '—'}</td>
                   <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{record.date}</td>
-                  <td className="px-4 py-3 text-right relative">
-                    <button
-                      type="button"
-                      onClick={() => setOpenActionId(openActionId === record.id ? null : record.id)}
-                      className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-[#1a2744] transition"
-                      aria-label="Record actions"
+                  <td className="px-4 py-3 text-right">
+                    <RecordActionMenu
+                      open={openActionId === record.id}
+                      onToggle={() => setOpenActionId(openActionId === record.id ? null : record.id)}
+                      onClose={() => setOpenActionId(null)}
                     >
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <circle cx="10" cy="4" r="1.5" />
-                        <circle cx="10" cy="10" r="1.5" />
-                        <circle cx="10" cy="16" r="1.5" />
-                      </svg>
-                    </button>
-                    {openActionId === record.id && (
-                      <div className="absolute right-4 top-10 z-30 w-32 overflow-hidden rounded-xl border border-[#1a2744] bg-[#0f1c35] shadow-2xl shadow-black/40">
-                        <button type="button" onClick={() => handleEditRecord(record)} className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-white/10 hover:text-white transition">Edit</button>
-                        <button type="button" onClick={() => handleDeleteRecord(record)} className="w-full px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10 transition">Delete</button>
-                      </div>
-                    )}
+                      <button type="button" onClick={() => handleEditRecord(record)} className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-white/10 hover:text-white transition">Edit</button>
+                      <button type="button" onClick={() => handleDeleteRecord(record)} className="w-full px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10 transition">Delete</button>
+                    </RecordActionMenu>
                   </td>
                 </tr>
               ))}

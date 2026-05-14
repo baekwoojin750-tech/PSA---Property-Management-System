@@ -94,7 +94,7 @@ function Pagination({ page, total, perPage, onChange }: { page: number; total: n
   const totalPages = Math.ceil(total / perPage)
   if (totalPages <= 1) return null
   return (
-    <div className="flex items-center justify-between px-5 py-3 border-t border-[#1a2744]">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3 border-t border-[#1a2744]">
       <span className="text-xs text-slate-500">
         Showing {Math.min((page - 1) * perPage + 1, total)}–{Math.min(page * perPage, total)} of {total}
       </span>
@@ -609,13 +609,13 @@ export default function UserLayout() {
 
       {/* ── Vertical Sidebar ─────────────────────────────────────────────────── */}
       <aside className={`
-        fixed top-0 left-0 h-full z-40 flex flex-col
+        fixed bottom-0 left-0 right-0 h-16 sm:top-0 sm:right-auto sm:h-full z-40 flex flex-row sm:flex-col
         bg-[#080e1a] border-r border-[#1a2744]
         transition-all duration-300 ease-in-out
-        ${sidebarOpen ? 'w-56' : 'w-[60px]'}
+        ${sidebarOpen ? 'sm:w-56' : 'sm:w-[60px]'}
       `}>
         {/* Toggle */}
-        <div className={`flex items-center h-14 border-b border-[#1a2744] px-3 ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
+        <div className={`hidden sm:flex items-center h-14 border-b border-[#1a2744] px-3 ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
           {sidebarOpen && (
             <div className="flex items-center gap-2 overflow-hidden">
               <div className="w-7 h-7 flex items-center justify-center shrink-0 overflow-hidden">
@@ -636,7 +636,7 @@ export default function UserLayout() {
         </div>
 
         {/* Nav items */}
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-1 px-2">
+        <nav className="flex flex-1 items-center justify-around overflow-x-auto overflow-y-hidden sm:block sm:overflow-y-auto sm:overflow-x-hidden py-2 sm:py-3 sm:space-y-1 px-1 sm:px-2">
           {NAV_ITEMS.map(({ page, label, icon }) => {
             const isActive = activePage === page
             return (
@@ -645,22 +645,22 @@ export default function UserLayout() {
                 onClick={() => setActivePage(page)}
                 title={!sidebarOpen ? label : undefined}
                 className={`
-                  w-full flex items-center gap-3 rounded-xl transition-all duration-200
-                  ${sidebarOpen ? 'px-3 py-2.5' : 'px-0 py-2.5 justify-center'}
+                  flex min-w-[3.5rem] sm:w-full items-center justify-center sm:justify-start gap-3 rounded-xl transition-all duration-200
+                  ${sidebarOpen ? 'sm:px-3 py-2.5' : 'px-0 py-2.5 sm:justify-center'}
                   ${isActive
                     ? 'bg-blue-600/15 text-blue-400 border border-blue-600/25'
                     : 'text-slate-500 hover:text-white hover:bg-[#0f1a2e] border border-transparent'}
                 `}
               >
                 {icon(isActive)}
-                {sidebarOpen && <span className="text-sm font-medium whitespace-nowrap">{label}</span>}
+                {sidebarOpen && <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">{label}</span>}
               </button>
             )
           })}
         </nav>
 
         {/* Bottom */}
-        <div className="border-t border-[#1a2744] py-3 px-2 space-y-1">
+        <div className="flex items-center border-l border-[#1a2744] px-1 sm:block sm:border-l-0 sm:border-t sm:py-3 sm:px-2 sm:space-y-1">
           <button
             onClick={async () => {
               if (user?.id && user?.email && user?.full_name && role) {
@@ -670,12 +670,12 @@ export default function UserLayout() {
               navigate('/login')
             }}
             title={!sidebarOpen ? 'Sign Out' : undefined}
-            className={`w-full flex items-center gap-3 rounded-xl py-2.5 transition-all duration-200 text-slate-500 hover:text-red-400 hover:bg-red-500/5 border border-transparent hover:border-red-500/15 ${sidebarOpen ? 'px-3' : 'px-0 justify-center'}`}
+            className={`w-12 sm:w-full flex items-center justify-center sm:justify-start gap-3 rounded-xl py-2.5 transition-all duration-200 text-slate-500 hover:text-red-400 hover:bg-red-500/5 border border-transparent hover:border-red-500/15 ${sidebarOpen ? 'sm:px-3' : 'px-0 sm:justify-center'}`}
           >
             <LogoutIcon />
             {sidebarOpen && <span className="text-sm font-medium whitespace-nowrap">Sign Out</span>}
           </button>
-          <div className={`flex items-center gap-3 px-2 py-2 rounded-xl ${sidebarOpen ? '' : 'justify-center'}`} title={!sidebarOpen ? (saved.fullName || 'User') : undefined}>
+          <div className={`hidden sm:flex items-center gap-3 px-2 py-2 rounded-xl ${sidebarOpen ? '' : 'justify-center'}`} title={!sidebarOpen ? (saved.fullName || 'User') : undefined}>
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-800 flex items-center justify-center text-white text-xs font-bold shadow shrink-0 overflow-hidden">
               {avatarUrl
                 ? <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover rounded-full" />
@@ -692,8 +692,8 @@ export default function UserLayout() {
       </aside>
 
       {/* ── Main content ─────────────────────────────────────────────────────── */}
-      <main className={`flex-1 min-h-screen transition-all duration-300 ease-in-out ${sidebarOpen ? 'ml-56' : 'ml-[60px]'}`}>
-        <div className="max-w-5xl mx-auto px-6 pt-10 pb-10 space-y-6">
+      <main className={`flex-1 min-w-0 min-h-screen transition-all duration-300 ease-in-out ${sidebarOpen ? 'sm:ml-56' : 'sm:ml-[60px]'}`}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 pb-24 sm:pb-10 space-y-6">
 
           <div>
             <h1 className="text-2xl font-bold text-white">{pageTitles[activePage].title}</h1>
@@ -727,10 +727,10 @@ export default function UserLayout() {
                     </div>
                   </div>
                   <div className="flex-1 px-6 py-6 space-y-5">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest">Account Details</p>
                       {isEditing ? (
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <button onClick={handleCancel} className="text-xs px-3 py-1.5 rounded-lg border border-[#1a2744] text-slate-400 hover:text-white transition">Cancel</button>
                           <button onClick={handleSave}   className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition">Save Changes</button>
                         </div>

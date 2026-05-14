@@ -174,7 +174,7 @@ function RoleSection({
         <div className="flex-1 h-px bg-[#1a2744]" />
       </div>
 
-      <div className={`grid gap-4 mb-8 ${title === 'Super Admin' ? 'grid-cols-1 place-items-center' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'}`}>
+      <div className={`grid gap-4 mb-8 ${title === 'Super Admin' ? 'grid-cols-1 place-items-center' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'}`}>
         {users.length === 0 ? (
           <p className="col-span-full text-center text-slate-600 text-sm py-6">No {title.toLowerCase()} accounts.</p>
         ) : (
@@ -327,7 +327,7 @@ export default function UserManagement() {
             <h1 className="text-2xl font-bold text-white">User Management</h1>
             <p className="text-slate-400 text-sm mt-0.5">Super admin creates admin accounts here. The registration form stays for regular users only.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-400 bg-[#0a1120] border border-[#1a2744] rounded-xl px-4 py-2">
               <span className="text-white font-semibold">{users.length}</span> total users
             </div>

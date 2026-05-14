@@ -310,11 +310,11 @@ export function AssetRegistration() {
           </div>
 
           {/* QR section + Actions */}
-          <div className="flex items-end justify-between gap-4 pt-2 border-t border-[#1a2744] mt-2">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 pt-2 border-t border-[#1a2744] mt-2">
             {/* QR Preview block */}
             <div className="flex-1 bg-[#0a1020] border border-[#1a2744] rounded-xl p-4">
               <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">Unit QR Code</p>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex items-center justify-center w-20 h-20 bg-[#0f1623] border border-[#1e2d45] rounded-xl shrink-0 overflow-hidden">
                   {qrValue ? (
                     <QRCodeImage value={qrValue} size={80} />
@@ -339,18 +339,18 @@ export function AssetRegistration() {
             </div>
 
             {/* Buttons */}
-            <div className="flex gap-2 shrink-0">
+            <div className="flex w-full flex-col sm:w-auto sm:flex-row gap-2 shrink-0">
               <button
                 type="button"
                 onClick={clearForm}
-                className="px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 border border-[#1e2d45] hover:bg-[#1a2744] hover:text-white transition"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 border border-[#1e2d45] hover:bg-[#1a2744] hover:text-white transition"
               >
                 Clear
               </button>
               <button
                 type="button"
                 onClick={handleSubmit}
-                className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white transition shadow-lg shadow-blue-900/40 flex items-center gap-2"
+                className="w-full sm:w-auto justify-center px-5 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white transition shadow-lg shadow-blue-900/40 flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -386,17 +386,17 @@ export function AssetRegistration() {
               />
             </div>
             <select value={locationFilter} onChange={e => setLocationFilter(e.target.value)}
-              className="bg-[#0f1623] border border-[#1e2d45] rounded-lg px-3 py-2 text-xs text-slate-400 focus:outline-none focus:border-blue-500 cursor-pointer">
+              className="w-full sm:w-auto bg-[#0f1623] border border-[#1e2d45] rounded-lg px-3 py-2 text-xs text-slate-400 focus:outline-none focus:border-blue-500 cursor-pointer">
               <option value="All" className="bg-slate-900">All Locations</option>
               {locations.map(l => <option key={l} value={l} className="bg-slate-900">{l}</option>)}
             </select>
             <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}
-              className="bg-[#0f1623] border border-[#1e2d45] rounded-lg px-3 py-2 text-xs text-slate-400 focus:outline-none focus:border-blue-500 cursor-pointer">
+              className="w-full sm:w-auto bg-[#0f1623] border border-[#1e2d45] rounded-lg px-3 py-2 text-xs text-slate-400 focus:outline-none focus:border-blue-500 cursor-pointer">
               <option value="All" className="bg-slate-900">All Categories</option>
               {equipmentCategories.map(c => <option key={c} value={c} className="bg-slate-900">{c}</option>)}
             </select>
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-              className="bg-[#0f1623] border border-[#1e2d45] rounded-lg px-3 py-2 text-xs text-slate-400 focus:outline-none focus:border-blue-500 cursor-pointer">
+              className="w-full sm:w-auto bg-[#0f1623] border border-[#1e2d45] rounded-lg px-3 py-2 text-xs text-slate-400 focus:outline-none focus:border-blue-500 cursor-pointer">
               <option value="All" className="bg-slate-900">All Status</option>
               {statuses.map(s => <option key={s} value={s} className="bg-slate-900">{s}</option>)}
             </select>
@@ -405,7 +405,7 @@ export function AssetRegistration() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[980px]">
             <thead>
               <tr className="border-b border-[#1a2744]">
                 {['Property No.', 'Item Name', 'Category', 'Location', 'Asset Tag', 'Serial No.', 'Unit Cost', 'Date Purchased', 'Status', 'Custodian', 'Action'].map(h => (
@@ -461,11 +461,11 @@ export function AssetRegistration() {
         </div>
 
         {/* Pagination */}
-        <div className="px-5 py-3 border-t border-[#1a2744] flex items-center justify-between">
+        <div className="px-5 py-3 border-t border-[#1a2744] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <p className="text-slate-600 text-xs">
             {filtered.length === 0 ? '0' : `${(page - 1) * PER_PAGE + 1}–${Math.min(page * PER_PAGE, filtered.length)}`} of {filtered.length}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full sm:w-auto items-center justify-between sm:justify-start gap-2">
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}

@@ -109,6 +109,7 @@ export default function AuthPage() {
         .auth-root {
           font-family: 'DM Sans', sans-serif;
           min-height: 100vh;
+          min-height: 100dvh;
           background: #060d1f;
           display: flex;
           align-items: center;
@@ -466,9 +467,34 @@ export default function AuthPage() {
         .register-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
 
         @media (max-width: 700px) {
-          .card { grid-template-columns: 1fr; min-height: unset; }
+          .auth-root {
+            align-items: flex-start;
+            padding: 1rem;
+            overflow-y: auto;
+          }
+          .card {
+            grid-template-columns: 1fr;
+            min-height: unset;
+            max-width: 420px;
+            border-radius: 18px;
+          }
           .panel-left { display: none; }
           .panel-right { padding: 2rem 1.5rem; }
+          .field-row {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 0.75rem;
+          }
+          .register-scroll {
+            max-height: none;
+            overflow: visible;
+            padding-right: 0;
+          }
+        }
+
+        @media (max-width: 380px) {
+          .auth-root { padding: 0.75rem; }
+          .panel-right { padding: 1.5rem 1rem; }
         }
       `}</style>
 

@@ -55,8 +55,8 @@ export default function Navbar() {
   const links = navLinks[role as keyof typeof navLinks] ?? navLinks['user']
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 flex justify-center px-3 py-3 sm:px-4 sm:py-4">
-      <div className="flex items-center gap-2 sm:gap-6 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl sm:rounded-full px-3 py-2.5 sm:px-6 shadow-xl shadow-black/30 w-full max-w-5xl">
+    <div className="fixed top-0 left-0 right-0 z-50 flex justify-center px-2 py-2.5 sm:px-4 sm:py-4">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-6 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl sm:rounded-full px-2.5 py-2.5 sm:px-6 shadow-xl shadow-black/30 w-full max-w-5xl">
 
         {/* Logo */}
         <div
@@ -112,7 +112,7 @@ export default function Navbar() {
         <div className="relative shrink-0" ref={dropdownRef}>
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center gap-2 hover:bg-slate-800 rounded-full px-1.5 sm:px-2 py-1 transition"
+            className="flex min-w-0 items-center gap-1.5 sm:gap-2 hover:bg-slate-800 rounded-full px-1 sm:px-2 py-1 transition"
           >
             <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white text-xs font-bold">
               {user?.avatar_url

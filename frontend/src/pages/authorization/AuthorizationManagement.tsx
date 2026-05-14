@@ -167,7 +167,7 @@ export default function AuthorizationManagement() {
       <div className="max-w-7xl mx-auto px-4 pt-28 pb-10 space-y-6">
 
         {/* Header */}
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-white">Authorization Management</h1>
             <p className="text-slate-400 text-sm mt-0.5">Review admin requests for Dashboard, Assets & Inventory</p>
@@ -179,7 +179,7 @@ export default function AuthorizationManagement() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1">
           {(['pending', 'all'] as const).map((tab) => (
             <button
               key={tab}
@@ -227,7 +227,7 @@ export default function AuthorizationManagement() {
           ) : (
             <div className="bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[760px]">
                   <thead>
                     <tr className="border-b border-slate-700">
                       <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Admin</th>
@@ -351,7 +351,7 @@ export default function AuthorizationManagement() {
           ) : (
             <div className="bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[720px]">
                   <thead>
                     <tr className="border-b border-slate-700">
                       <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Admin</th>

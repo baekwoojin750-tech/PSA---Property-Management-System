@@ -53,21 +53,23 @@ export default function BorrowRequest() {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 bg-[#0a1120] border border-[#1a2744] rounded-2xl p-1.5 w-fit">
-            {tabs.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center justify-center gap-2 px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                  activeTab === tab.key
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white hover:bg-[#0f1a2e]'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
+          <div className="overflow-x-auto -mx-4 px-4">
+            <div className="flex gap-1 bg-[#0a1120] border border-[#1a2744] rounded-2xl p-1.5 w-fit min-w-full sm:min-w-0">
+              {tabs.map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                    activeTab === tab.key
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white hover:bg-[#0f1a2e]'
+                  }`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Tab Content */}

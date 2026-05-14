@@ -5,8 +5,9 @@ import { createActivityLog, getMyActivityLogs, logoutUserWithActivity } from '..
 import BorrowTab from '../borrow/BorrowTab'
 import GatePassTab from '../borrow/GatepassTab'
 import ReturnSlipTab from '../borrow/ReturnSlipTab'
+import { AssetScanner } from '../assets/AssetScanner'
 
-type ActivePage = 'profile' | 'activity' | 'borrow' | 'gatepass' | 'return'
+type ActivePage = 'profile' | 'activity' | 'scanner' | 'borrow' | 'gatepass' | 'return'
 type LogType = 'login' | 'logout' | 'asset' | 'request' | 'user' | 'system'
 
 type ActivityLog = { id: number; action: string; detail: string; timestamp: string; type: LogType }
@@ -39,6 +40,11 @@ const ProfileIcon  = ({ active }: { active: boolean }) => (
 const ActivityIcon = ({ active }: { active: boolean }) => (
   <svg className={`w-5 h-5 shrink-0 transition-colors ${active ? 'text-blue-400' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
+  </svg>
+)
+const ScannerIcon = ({ active }: { active: boolean }) => (
+  <svg className={`w-5 h-5 shrink-0 transition-colors ${active ? 'text-blue-400' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 7.5V5.625A1.875 1.875 0 0 1 5.625 3.75H7.5m9 0h1.875A1.875 1.875 0 0 1 20.25 5.625V7.5m0 9v1.875a1.875 1.875 0 0 1-1.875 1.875H16.5m-9 0H5.625a1.875 1.875 0 0 1-1.875-1.875V16.5M8.25 8.25h.008v.008H8.25V8.25Zm3.75 0h.008v.008H12V8.25Zm3.75 0h.008v.008h-.008V8.25ZM8.25 12h.008v.008H8.25V12Zm3.75 0h.008v.008H12V12Zm3.75 0h.008v.008h-.008V12ZM8.25 15.75h.008v.008H8.25v-.008Zm3.75 0h.008v.008H12v-.008Zm3.75 0h.008v.008h-.008v-.008Z" />
   </svg>
 )
 const BorrowIcon   = ({ active }: { active: boolean }) => (
@@ -523,6 +529,7 @@ function ActivityLogsSection() {
 const NAV_ITEMS: { page: ActivePage; label: string; icon: (active: boolean) => React.ReactNode }[] = [
   { page: 'profile',  label: 'My Profile',    icon: a => <ProfileIcon  active={a} /> },
   { page: 'activity', label: 'Activity Logs', icon: a => <ActivityIcon active={a} /> },
+  { page: 'scanner',  label: 'QR Scanner',    icon: a => <ScannerIcon  active={a} /> },
   { page: 'borrow',   label: 'Borrow Request',icon: a => <BorrowIcon   active={a} /> },
   { page: 'gatepass', label: 'Gate Pass',     icon: a => <GatepassIcon active={a} /> },
   { page: 'return',   label: 'Return Slip',   icon: a => <ReturnIcon   active={a} /> },
@@ -599,6 +606,7 @@ export default function UserLayout() {
   const pageTitles: Record<ActivePage, { title: string; subtitle: string }> = {
     profile:  { title: 'My Profile',     subtitle: 'View and manage your account information'         },
     activity: { title: 'Activity Logs',  subtitle: 'Your recent account activity and session history' },
+    scanner:  { title: 'QR Scanner',     subtitle: 'Scan a unit QR code to view details and start a request' },
     borrow:   { title: 'Borrow Request', subtitle: 'Submit and track equipment borrow requests'       },
     gatepass: { title: 'Gate Pass',      subtitle: 'Generate and manage gate pass slips'              },
     return:   { title: 'Return Slip',    subtitle: 'Process and record equipment returns'             },
@@ -771,6 +779,7 @@ export default function UserLayout() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {([
                   { page: 'activity' as ActivePage, label: 'Activity Logs',  sub: 'View your recent account activity', icon: <ActivityIcon active={false} /> },
+                  { page: 'scanner'  as ActivePage, label: 'QR Scanner',     sub: 'Scan unit QR codes and view details', icon: <ScannerIcon active={false} /> },
                   { page: 'borrow'   as ActivePage, label: 'Borrow Request', sub: 'Submit and track borrow requests',  icon: <BorrowIcon   active={false} /> },
                   { page: 'gatepass' as ActivePage, label: 'Gate Pass',      sub: 'Generate gate pass slips',          icon: <GatepassIcon active={false} /> },
                   { page: 'return'   as ActivePage, label: 'Return Slip',    sub: 'Process equipment returns',         icon: <ReturnIcon   active={false} /> },
@@ -793,6 +802,37 @@ export default function UserLayout() {
 
           {/* ── ACTIVITY LOGS PAGE ── */}
           {activePage === 'activity' && <ActivityLogsSection />}
+
+          {activePage === 'scanner' && (
+            <div className="space-y-6">
+              <div className="bg-[#0a1120] border border-[#1a2744] rounded-2xl px-5 py-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-white text-sm font-semibold">Scan Unit QR</p>
+                    <p className="text-slate-500 text-xs mt-1">After scanning, review the unit details, then continue with the needed request.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {[
+                      { page: 'borrow' as ActivePage, label: 'Borrow Request', icon: <BorrowIcon active={false} /> },
+                      { page: 'gatepass' as ActivePage, label: 'Gate Pass', icon: <GatepassIcon active={false} /> },
+                      { page: 'return' as ActivePage, label: 'Return Slip', icon: <ReturnIcon active={false} /> },
+                    ].map(action => (
+                      <button
+                        key={action.page}
+                        type="button"
+                        onClick={() => setActivePage(action.page)}
+                        className="flex items-center justify-center gap-2 rounded-xl border border-[#1a2744] bg-[#0f1a2e] px-3 py-2 text-xs font-semibold text-slate-300 hover:border-blue-500/40 hover:text-white transition"
+                      >
+                        {action.icon}
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <AssetScanner />
+            </div>
+          )}
 
           {/* ── BORROW REQUEST PAGE ── */}
           {activePage === 'borrow' && (

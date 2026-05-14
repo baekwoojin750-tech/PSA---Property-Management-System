@@ -94,6 +94,8 @@ const emptyForm: BorrowForm = {
 
 interface BorrowTabProps {
   showRecords?: boolean
+  scannedAsset?: Asset | null
+  hideScannedItemSection?: boolean
 }
 
 const statusColor: Record<string, string> = {
@@ -103,7 +105,7 @@ const statusColor: Record<string, string> = {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
+export default function BorrowTab({ showRecords = true, scannedAsset = null, hideScannedItemSection = false }: BorrowTabProps) {
   const printRef = useRef<HTMLDivElement>(null)
 
   // Same image sources as GatepassTab / ReturnSlipTab
@@ -202,6 +204,20 @@ export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
 
   const getPeriodCovered = (startDate = form.startDate, endDate = form.endDate) =>
     [startDate, endDate].filter(Boolean).join(' - ')
+
+  useEffect(() => {
+    if (!scannedAsset) return
+    setForm(f => ({
+      ...f,
+      items: [{
+        description: scannedAsset.itemName,
+        equipmentCategory: scannedAsset.equipmentCategory,
+        propertyNumber: scannedAsset.propertyNumber,
+        destination: f.toDestination,
+        periodCovered: getPeriodCovered(f.startDate, f.endDate),
+      }],
+    }))
+  }, [scannedAsset?.propertyNumber])
 
   const formatPropertyNumber = (value: string) => {
     const digits = value.replace(/\D/g, '')
@@ -971,6 +987,25 @@ export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
           </div>
 
           {/* Items */}
+          {hideScannedItemSection && scannedAsset ? (
+            <div className="bg-[#0a1020] border border-blue-500/20 rounded-xl px-4 py-3">
+              <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-widest mb-2">Scanned Item</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <span className="text-slate-600 block mb-0.5">Description</span>
+                  <span className="text-white font-medium">{scannedAsset.itemName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-600 block mb-0.5">Property No.</span>
+                  <span className="text-blue-400 font-mono">{scannedAsset.propertyNumber}</span>
+                </div>
+                <div>
+                  <span className="text-slate-600 block mb-0.5">Category</span>
+                  <span className="text-slate-300">{scannedAsset.equipmentCategory || '—'}</span>
+                </div>
+              </div>
+            </div>
+          ) : (
           <div>
             <div className="flex items-center justify-between mb-3">
               <label className={labelClass}>Items to Borrow</label>
@@ -1013,6 +1048,7 @@ export default function BorrowTab({ showRecords = true }: BorrowTabProps) {
               ))}
             </div>
           </div>
+          )}
 
           {/* Actions */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-[#1a2744]">

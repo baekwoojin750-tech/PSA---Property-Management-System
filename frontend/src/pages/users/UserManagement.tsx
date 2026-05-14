@@ -309,7 +309,7 @@ export default function UserManagement() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#080e1a]">
+      <div className="app-shell-bg min-h-screen">
         <Navbar />
         <div className="max-w-7xl mx-auto px-4 pt-28 pb-10">
           <div className="text-center text-slate-400">Loading users...</div>
@@ -319,7 +319,7 @@ export default function UserManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080e1a]">
+    <div className="app-shell-bg min-h-screen">
       <Navbar />
       <div className="max-w-7xl mx-auto px-4 pt-28 pb-10 space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

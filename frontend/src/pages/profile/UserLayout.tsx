@@ -6,8 +6,10 @@ import BorrowTab from '../borrow/BorrowTab'
 import GatePassTab from '../borrow/GatepassTab'
 import ReturnSlipTab from '../borrow/ReturnSlipTab'
 import { AssetScanner } from '../assets/AssetScanner'
+import type { Asset } from '../assets/assetTypes'
 
 type ActivePage = 'profile' | 'activity' | 'scanner' | 'borrow' | 'gatepass' | 'return'
+type ScannerRequestMode = 'borrow' | 'gatepass' | 'return'
 type LogType = 'login' | 'logout' | 'asset' | 'request' | 'user' | 'system'
 
 type ActivityLog = { id: number; action: string; detail: string; timestamp: string; type: LogType }
@@ -542,6 +544,8 @@ export default function UserLayout() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activePage, setActivePage]   = useState<ActivePage>('profile')
+  const [scannedAsset, setScannedAsset] = useState<Asset | null>(null)
+  const [scannerRequestMode, setScannerRequestMode] = useState<ScannerRequestMode>('borrow')
 
   const [isEditing, setIsEditing] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatar_url || null)
@@ -613,7 +617,7 @@ export default function UserLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080e1a] flex">
+    <div className="app-shell-bg min-h-screen flex">
 
       {/* ── Vertical Sidebar ─────────────────────────────────────────────────── */}
       <aside className={`
@@ -809,19 +813,23 @@ export default function UserLayout() {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className="text-white text-sm font-semibold">Scan Unit QR</p>
-                    <p className="text-slate-500 text-xs mt-1">After scanning, review the unit details, then continue with the needed request.</p>
+                    <p className="text-slate-500 text-xs mt-1">After scanning, choose the request type. The original form opens with the scanned item already filled in.</p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {[
-                      { page: 'borrow' as ActivePage, label: 'Borrow Request', icon: <BorrowIcon active={false} /> },
-                      { page: 'gatepass' as ActivePage, label: 'Gate Pass', icon: <GatepassIcon active={false} /> },
-                      { page: 'return' as ActivePage, label: 'Return Slip', icon: <ReturnIcon active={false} /> },
+                      { mode: 'borrow' as ScannerRequestMode, label: 'Borrow Request', icon: <BorrowIcon active={scannerRequestMode === 'borrow'} /> },
+                      { mode: 'gatepass' as ScannerRequestMode, label: 'Gate Pass', icon: <GatepassIcon active={scannerRequestMode === 'gatepass'} /> },
+                      { mode: 'return' as ScannerRequestMode, label: 'Return Slip', icon: <ReturnIcon active={scannerRequestMode === 'return'} /> },
                     ].map(action => (
                       <button
-                        key={action.page}
+                        key={action.mode}
                         type="button"
-                        onClick={() => setActivePage(action.page)}
-                        className="flex items-center justify-center gap-2 rounded-xl border border-[#1a2744] bg-[#0f1a2e] px-3 py-2 text-xs font-semibold text-slate-300 hover:border-blue-500/40 hover:text-white transition"
+                        onClick={() => setScannerRequestMode(action.mode)}
+                        className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                          scannerRequestMode === action.mode
+                            ? 'border-blue-500/40 bg-blue-600/15 text-white'
+                            : 'border-[#1a2744] bg-[#0f1a2e] text-slate-300 hover:border-blue-500/40 hover:text-white'
+                        }`}
                       >
                         {action.icon}
                         {action.label}
@@ -830,7 +838,34 @@ export default function UserLayout() {
                   </div>
                 </div>
               </div>
-              <AssetScanner />
+              <AssetScanner
+                suppressAssetModal
+                onAssetScanned={(asset) => setScannedAsset(asset)}
+              />
+              {scannedAsset && (
+                <div className="bg-[#0a1120] border border-blue-500/20 rounded-2xl overflow-hidden">
+                  <div className="px-5 py-4 border-b border-[#1a2744] flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-white text-sm font-semibold">Scanned Unit Details</p>
+                      <p className="text-slate-500 text-xs mt-0.5">{scannedAsset.itemName} · {scannedAsset.propertyNumber}</p>
+                    </div>
+                    <span className="w-fit rounded-full border border-blue-500/25 bg-blue-500/10 px-3 py-1 text-[10px] font-semibold text-blue-300">
+                      {scannerRequestMode === 'borrow' ? 'Borrow Request Form' : scannerRequestMode === 'gatepass' ? 'Gate Pass Form' : 'Return Slip Form'}
+                    </span>
+                  </div>
+                  <div className="px-5 py-5">
+                    {scannerRequestMode === 'borrow' && (
+                      <BorrowTab showRecords={false} scannedAsset={scannedAsset} hideScannedItemSection />
+                    )}
+                    {scannerRequestMode === 'gatepass' && (
+                      <GatePassTab showRecords={false} scannedAsset={scannedAsset} hideScannedItemSection />
+                    )}
+                    {scannerRequestMode === 'return' && (
+                      <ReturnSlipTab showRecords={false} scannedAsset={scannedAsset} hideScannedItemSection />
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

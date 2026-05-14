@@ -147,7 +147,7 @@ export default function AuthorizationManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="app-shell-bg min-h-screen">
       <Navbar />
 
       {toast && (

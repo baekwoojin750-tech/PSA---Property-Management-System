@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import type { BorrowRecord } from './BorrowTab'
+import type { Asset } from '../assets/assetTypes'
 import { RecordActionMenu } from './RecordActionMenu'
 import { getAllBorrowRequests, updateBorrowRequest } from '../../services/authService'
 
@@ -90,9 +91,11 @@ const statusColor: Record<string, string> = {
 // ─── Main Component ───────────────────────────────────────────────────────────
 interface ReturnSlipTabProps {
   showRecords?: boolean
+  scannedAsset?: Asset | null
+  hideScannedItemSection?: boolean
 }
 
-export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps) {
+export default function ReturnSlipTab({ showRecords = true, scannedAsset = null, hideScannedItemSection = false }: ReturnSlipTabProps) {
   const printRef = useRef<HTMLDivElement>(null)
   const psaLogo    = useBase64Image('/headerImage1.jpg')
   const bagongLogo = useBase64Image('/headerImage2.png')
@@ -167,6 +170,22 @@ export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps
   const inputClass = "w-full bg-[#0f1623] border border-[#1e2d45] rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition"
   const labelClass = "block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1"
   const today = new Date().toISOString().split('T')[0]
+
+  useEffect(() => {
+    if (!scannedAsset) return
+    const now = new Date()
+    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+    setForm(f => ({
+      ...f,
+      borrowedFromName: scannedAsset.custodian || f.borrowedFromName,
+      items: [{
+        description: scannedAsset.itemName,
+        propertyNumber: scannedAsset.propertyNumber,
+        dateTimeReturned: localDateTime,
+        remarks: '',
+      }],
+    }))
+  }, [scannedAsset?.propertyNumber])
 
   const setField = (key: keyof ReturnForm, value: string) =>
     setForm(f => ({ ...f, [key]: value }))
@@ -755,6 +774,25 @@ export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps
           </div>
 
           {/* Items Section */}
+          {hideScannedItemSection && scannedAsset ? (
+            <div className="bg-[#0a1020] border border-emerald-500/20 rounded-xl px-4 py-3">
+              <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-widest mb-2">Scanned Item</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <span className="text-slate-600 block mb-0.5">Description</span>
+                  <span className="text-white font-medium">{scannedAsset.itemName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-600 block mb-0.5">Property No.</span>
+                  <span className="text-emerald-400 font-mono">{scannedAsset.propertyNumber}</span>
+                </div>
+                <div>
+                  <span className="text-slate-600 block mb-0.5">Date/Time Returned</span>
+                  <span className="text-slate-300">{form.items[0]?.dateTimeReturned?.replace('T', ' ') || 'Auto-filled'}</span>
+                </div>
+              </div>
+            </div>
+          ) : (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-white font-semibold text-sm">Items Being Returned</h3>
@@ -796,6 +834,7 @@ export default function ReturnSlipTab({ showRecords = true }: ReturnSlipTabProps
               </div>
             ))}
           </div>
+          )}
 
           {/* Row: Accountable Officer + Guard */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

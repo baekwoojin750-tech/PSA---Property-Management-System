@@ -4,7 +4,12 @@ import { statusColor, transformAsset } from './assetTypes'
 import { AssetModal } from './assetComponents'
 import { getAllAssets } from '../../services/authService'
 
-export function AssetScanner() {
+type AssetScannerProps = {
+  onAssetScanned?: (asset: Asset) => void
+  suppressAssetModal?: boolean
+}
+
+export function AssetScanner({ onAssetScanned, suppressAssetModal = false }: AssetScannerProps = {}) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -88,7 +93,8 @@ export function AssetScanner() {
           const found = assetsRef.current.find(a => a.propertyNumber === code.data || a.assetTag === code.data || a.serialNumber === code.data)
           if (found) {
             stopCamera()
-            setScannedAsset(found)
+            onAssetScanned?.(found)
+            if (!suppressAssetModal) setScannedAsset(found)
             setRecentScans(prev => {
               const alreadyLogged = prev.some(s => s.propertyNumber === found.propertyNumber)
               if (alreadyLogged) return prev
@@ -116,7 +122,7 @@ export function AssetScanner() {
             : err?.message || 'Camera access denied'
       setCameraError(message)
     }
-  }, [isSecureCameraContext, loadJsQR, stopCamera])
+  }, [isSecureCameraContext, loadJsQR, onAssetScanned, stopCamera, suppressAssetModal])
 
   useEffect(() => () => stopCamera(), [stopCamera])
 
@@ -365,7 +371,7 @@ export function AssetScanner() {
       </div>
 
       {/* Asset Modal */}
-      {scannedAsset && (
+      {!suppressAssetModal && scannedAsset && (
         <AssetModal
           asset={scannedAsset}
           onClose={() => setScannedAsset(null)}

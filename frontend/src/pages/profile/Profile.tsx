@@ -313,7 +313,7 @@ export default function Profile() {
   )
 
   return (
-    <div className="min-h-screen bg-[#080e1a]">
+    <div className="app-shell-bg min-h-screen">
       <Navbar />
       <div className="max-w-7xl mx-auto px-4 pt-28 pb-10 space-y-4">
 

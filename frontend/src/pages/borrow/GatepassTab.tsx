@@ -73,6 +73,8 @@ interface GatepassTabProps {
   data?: GatePassData;
   onChange?: (data: GatePassData) => void;
   showRecords?: boolean;
+  scannedAsset?: Asset | null;
+  hideScannedItemSection?: boolean;
 }
 
 const emptyItem: GatePassItem = {
@@ -99,7 +101,7 @@ const defaultData: GatePassData = {
   guardOnDuty: "",
 };
 
-const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords = true }) => {
+const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords = true, scannedAsset = null, hideScannedItemSection = false }) => {
   const printRef = useRef<HTMLDivElement>(null);
   const [form, setForm] = useState<GatePassData>(data ?? defaultData);
 
@@ -457,6 +459,22 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
     return fmt(end)
   }
 
+  useEffect(() => {
+    if (!scannedAsset) return
+    const next = {
+      ...form,
+      items: [{
+        description: scannedAsset.itemName,
+        equipmentCategory: scannedAsset.equipmentCategory,
+        propertyNumber: scannedAsset.propertyNumber,
+        destination: form.destinationCity,
+        periodCovered: getPeriodCovered(),
+      }],
+    }
+    setForm(next)
+    onChange?.(next)
+  }, [scannedAsset?.propertyNumber])
+
   const setItem = (idx: number, key: keyof GatePassItem, value: string) => {
     const nextValue = key === 'propertyNumber' ? formatPropertyNumber(value) : value
     const items = form.items.map((it, i) => {
@@ -651,6 +669,25 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
           </div>
 
           {/* Items section */}
+          {hideScannedItemSection && scannedAsset ? (
+            <div className="bg-[#0a1020] border border-blue-500/20 rounded-xl px-4 py-3">
+              <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-widest mb-2">Scanned Item</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <span className="text-slate-600 block mb-0.5">Description</span>
+                  <span className="text-white font-medium">{scannedAsset.itemName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-600 block mb-0.5">Property No.</span>
+                  <span className="text-blue-400 font-mono">{scannedAsset.propertyNumber}</span>
+                </div>
+                <div>
+                  <span className="text-slate-600 block mb-0.5">Destination</span>
+                  <span className="text-slate-300">{form.destinationCity || 'Auto-filled when destination is entered'}</span>
+                </div>
+              </div>
+            </div>
+          ) : (
           <div>
             <div className="flex items-center justify-between mb-3">
               <label className={labelClass}>Items to Gate Pass ({form.items.length})</label>
@@ -706,6 +743,7 @@ const GatepassTab: React.FC<GatepassTabProps> = ({ data, onChange, showRecords =
               ))}
             </div>
           </div>
+          )}
 
           {/* Actions */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-[#1a2744]">
